@@ -1,9 +1,10 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import sqlite3
 import jwt
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
+import os
 
 app = Flask(__name__)
 CORS(app)
@@ -41,19 +42,10 @@ def init_db():
 
 init_db()
 
-# Landing page (public - no auth needed)
+# Serve landing page
 @app.route("/", methods=["GET"])
 def home():
-    return jsonify({
-        "message": "Welcome to XQXing-Plushy!",
-        "description": "All online tools in one place",
-        "tools": ["Smart Todo Manager", "JSON Formatter", "Scientific Calculator"],
-        "endpoints": {
-            "register": "/register",
-            "login": "/login",
-            "todos": "/todos"
-        }
-    }), 200
+    return send_from_directory(os.path.join(os.path.dirname(__file__), '..', 'frontend'), 'landing.html')
 
 # Helper function to verify JWT token and get user_id
 def verify_token(token):
@@ -116,6 +108,14 @@ def login():
         return jsonify({"token": token, "message": "Login successful"}), 200
     else:
         return jsonify({"message": "Invalid username or password"}), 401
+
+# Serve frontend static files (must be AFTER API routes)
+@app.route("/<path:filename>")
+def serve_static(filename):
+    try:
+        return send_from_directory(os.path.join(os.path.dirname(__file__), '..', 'frontend'), filename)
+    except:
+        return jsonify({"message": "File not found"}), 404
 
 @app.route("/todos", methods=["GET"])
 def get_todos():
