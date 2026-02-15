@@ -109,14 +109,6 @@ def login():
     else:
         return jsonify({"message": "Invalid username or password"}), 401
 
-# Serve frontend static files (must be AFTER API routes)
-@app.route("/<path:filename>")
-def serve_static(filename):
-    try:
-        return send_from_directory(os.path.join(os.path.dirname(__file__), '..', 'frontend'), filename)
-    except:
-        return jsonify({"message": "File not found"}), 404
-
 @app.route("/todos", methods=["GET"])
 def get_todos():
     token = request.headers.get("Authorization", "").replace("Bearer ", "")
@@ -181,8 +173,6 @@ def update_todo(id):
     conn.close()
     return jsonify({"message": "Updated"})
 
-
-
 # Delete task
 @app.route("/todos/<int:id>", methods=["DELETE"])
 def delete_todo(id):
@@ -204,5 +194,13 @@ def delete_todo(id):
     conn.close()
     return jsonify({"message": "Deleted"})
 
+# Serve frontend static files (must be AFTER all API routes)
+@app.route("/<path:filename>")
+def serve_static(filename):
+    try:
+        return send_from_directory(os.path.join(os.path.dirname(__file__), '..', 'frontend'), filename)
+    except:
+        return jsonify({"message": "File not found"}), 404
+
 if __name__ == "__main__":
-    app.run(debug=True,port="9999")
+    app.run(debug=True,port=9999) 
