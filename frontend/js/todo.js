@@ -1,20 +1,20 @@
-const API = "http://127.0.0.1:9999/todos";
+const TODO_API = "http://127.0.0.1:9999/todos";
 
 // Helper function to get authorization headers
 function getAuthHeaders() {
   const token = getToken();
   return {
     "Content-Type": "application/json",
-    "Authorization": `Bearer ${token}`
+    Authorization: `Bearer ${token}`,
   };
 }
 
 async function fetchTodos() {
   try {
-    const res = await fetch(API, {
-      headers: getAuthHeaders()
+    const res = await fetch(TODO_API, {
+      headers: getAuthHeaders(),
     });
-    
+
     if (!res.ok) {
       if (res.status === 401) {
         // Unauthorized - redirect to login
@@ -45,8 +45,8 @@ async function fetchTodos() {
               </div>
 
               <div>
-                <button onclick="completeTask(${todo.id},${todo.completed})">✔</button>
-                <button onclick="deleteTask(${todo.id})">🗑</button>
+                <button class="completeBtn" data-id="${todo.id}" data-completed="${todo.completed}">✔</button>
+                <button class="deleteBtn" data-id="${todo.id}">🗑</button>
               </div>
           `;
 
@@ -55,34 +55,55 @@ async function fetchTodos() {
       list.appendChild(li);
       checkNotification(todo);
     });
+
+    // Attach event listeners to dynamically created buttons
+    document.querySelectorAll(".completeBtn").forEach((btn) => {
+      btn.addEventListener("click", function () {
+        const id = this.getAttribute("data-id");
+        const completed = this.getAttribute("data-completed") === "1" ? 1 : 0;
+        completeTask(id, completed);
+      });
+    });
+
+    document.querySelectorAll(".deleteBtn").forEach((btn) => {
+      btn.addEventListener("click", function () {
+        const id = this.getAttribute("data-id");
+        deleteTask(id);
+      });
+    });
   } catch (error) {
     console.error("Error fetching todos:", error);
   }
 }
 
 async function addTask() {
+  console.log("addTask called"); // DEBUG
   const title = document.getElementById("title").value;
   const priority = document.getElementById("priority").value;
   const dueDate = document.getElementById("dueDate").value;
 
+  console.log("Task data:", { title, priority, dueDate }); // DEBUG
+
   if (!title) return alert("Enter task");
 
   try {
-    const res = await fetch(API, {
+    console.log("Sending request to API:", TODO_API); // DEBUG
+    const res = await fetch(TODO_API, {
       method: "POST",
       headers: getAuthHeaders(),
       body: JSON.stringify({ title, priority, due_date: dueDate }),
     });
 
-    const data = await res.json();
+    console.log("Response status:", res.status); // DEBUG
 
     if (res.ok) {
       document.getElementById("title").value = "";
       document.getElementById("dueDate").value = "";
       fetchTodos();
     } else {
-      alert("Error: " + (data.message || "Failed to add task"));
-      console.error("Response:", data);
+      const errorData = await res.json();
+      console.error("API Error:", errorData); // DEBUG
+      alert("Failed to add task");
     }
   } catch (error) {
     alert("Error connecting to server: " + error.message);
@@ -92,11 +113,11 @@ async function addTask() {
 
 async function deleteTask(id) {
   try {
-    const res = await fetch(API + "/" + id, { 
+    const res = await fetch(TODO_API + "/" + id, {
       method: "DELETE",
-      headers: getAuthHeaders()
+      headers: getAuthHeaders(),
     });
-    
+
     if (res.ok) {
       fetchTodos();
     } else {
@@ -109,14 +130,14 @@ async function deleteTask(id) {
 
 async function completeTask(id, completed) {
   try {
-    const res = await fetch(API + "/" + id, {
+    const res = await fetch(TODO_API + "/" + id, {
       method: "PUT",
       headers: getAuthHeaders(),
       body: JSON.stringify({
         completed: completed ? 0 : 1,
       }),
     });
-    
+
     if (res.ok) {
       fetchTodos();
     } else {
@@ -144,4 +165,16 @@ if (Notification.permission !== "granted") {
   Notification.requestPermission();
 }
 
-fetchTodos();
+// Attach event listeners after DOM is loaded
+document.addEventListener("DOMContentLoaded", () => {
+  console.log("DOMContentLoaded fired"); // DEBUG
+  const addTaskButton = document.getElementById("addTaskButton");
+  console.log("addTaskButton element:", addTaskButton); // DEBUG
+  if (addTaskButton) {
+    addTaskButton.addEventListener("click", addTask);
+    console.log("Attached click listener to addTaskButton"); // DEBUG
+  } else {
+    console.error("addTaskButton not found!"); // DEBUG
+  }
+  fetchTodos();
+});

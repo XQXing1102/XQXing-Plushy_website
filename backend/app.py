@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 import os
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources={r"/*": {"origins": "*"}})
 app.config['SECRET_KEY'] = 'XQXing&piyushzu'
 
 def get_db():
