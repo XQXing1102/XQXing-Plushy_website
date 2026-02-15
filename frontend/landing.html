@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>XQXing-Plushy - All Tools in One Place</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      line-height: 1.6;
+      color: #333;
+    }
+
+    /* Navigation */
+    nav {
+      background: white;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      padding: 1rem 2rem;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    nav .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    nav h2 {
+      color: #667eea;
+      font-size: 1.8rem;
+    }
+
+    nav .buttons {
+      display: flex;
+      gap: 15px;
+    }
+
+    .btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      text-decoration: none;
+      font-weight: bold;
+      transition: all 0.3s;
+    }
+
+    .btn-primary {
+      background: #667eea;
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #764ba2;
+      transform: translateY(-2px);
+    }
+
+    .btn-secondary {
+      background: white;
+      color: #667eea;
+      border: 2px solid #667eea;
+    }
+
+    .btn-secondary:hover {
+      background: #667eea;
+      color: white;
+    }
+
+    /* Hero Section */
+    .hero {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      text-align: center;
+      padding: 100px 20px;
+      min-height: 600px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .hero h1 {
+      font-size: 3rem;
+      margin-bottom: 20px;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+    }
+
+    .hero p {
+      font-size: 1.3rem;
+      margin-bottom: 30px;
+      max-width: 600px;
+      opacity: 0.95;
+    }
+
+    .hero .cta-buttons {
+      display: flex;
+      gap: 20px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .btn-large {
+      padding: 15px 40px;
+      font-size: 1.1rem;
+    }
+
+    /* Features Section */
+    .features {
+      padding: 80px 20px;
+      background: #f8f9fa;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .features h2 {
+      text-align: center;
+      font-size: 2.5rem;
+      margin-bottom: 50px;
+      color: #333;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 30px;
+    }
+
+    .feature-card {
+      background: white;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+      text-align: center;
+      transition: transform 0.3s, box-shadow 0.3s;
+    }
+
+    .feature-card:hover {
+      transform: translateY(-10px);
+      box-shadow: 0 10px 30px rgba(102, 126, 234, 0.2);
+    }
+
+    .feature-card h3 {
+      color: #667eea;
+      margin-bottom: 15px;
+      font-size: 1.5rem;
+    }
+
+    .feature-card p {
+      color: #666;
+      line-height: 1.8;
+    }
+
+    .feature-icon {
+      font-size: 3rem;
+      margin-bottom: 15px;
+    }
+
+    /* Tools Section */
+    .tools-section {
+      padding: 80px 20px;
+      background: white;
+    }
+
+    .tools-section h2 {
+      text-align: center;
+      font-size: 2.5rem;
+      margin-bottom: 50px;
+      color: #333;
+    }
+
+    .tools-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 25px;
+    }
+
+    .tool-card {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 40px;
+      border-radius: 10px;
+      text-align: center;
+      cursor: pointer;
+      transition: transform 0.3s, box-shadow 0.3s;
+      box-shadow: 0 5px 15px rgba(102, 126, 234, 0.2);
+    }
+
+    .tool-card:hover {
+      transform: translateY(-10px);
+      box-shadow: 0 15px 30px rgba(102, 126, 234, 0.3);
+    }
+
+    .tool-card h3 {
+      font-size: 1.3rem;
+      margin-bottom: 10px;
+    }
+
+    .tool-card.coming-soon {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    /* Footer */
+    footer {
+      background: #333;
+      color: white;
+      text-align: center;
+      padding: 30px 20px;
+    }
+
+    footer p {
+      margin-bottom: 10px;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .hero h1 {
+        font-size: 2rem;
+      }
+
+      .hero p {
+        font-size: 1rem;
+      }
+
+      nav .container {
+        flex-direction: column;
+        gap: 15px;
+      }
+
+      .hero .cta-buttons {
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .btn-large {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Navigation -->
+<nav>
+  <div class="container">
+    <h2>✨ XQXing-Plushy</h2>
+    <div class="buttons">
+      <a href="auth/login.html" class="btn btn-secondary">Login</a>
+      <a href="auth/register.html" class="btn btn-primary">Sign Up</a>
+    </div>
+  </div>
+</nav>
+
+<!-- Hero Section -->
+<section class="hero">
+  <h1>All Online Tools in One Place</h1>
+  <p>Simplify your workflow with our suite of powerful, easy-to-use online tools. Perfect for work, school, and everyday tasks.</p>
+  <div class="cta-buttons">
+    <a href="auth/register.html" class="btn btn-primary btn-large">Get Started Free</a>
+    <a href="#tools" class="btn btn-secondary btn-large" style="background: rgba(255,255,255,0.2); color: white; border-color: white;">Explore Tools</a>
+  </div>
+</section>
+
+<!-- Features Section -->
+<section class="features">
+  <div class="container">
+    <h2>Why Choose XQXing-Plushy?</h2>
+    <div class="feature-grid">
+      <div class="feature-card">
+        <div class="feature-icon">🔒</div>
+        <h3>Secure & Private</h3>
+        <p>Your data is encrypted and stored securely. Only you can access your tasks and information.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">⚡</div>
+        <h3>Fast & Responsive</h3>
+        <p>Lightning-fast performance on all devices. Works seamlessly on desktop, tablet, and mobile.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🎯</div>
+        <h3>Easy to Use</h3>
+        <p>Intuitive interface with no learning curve. Start being productive in seconds.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🔄</div>
+        <h3>Always Synced</h3>
+        <p>Your data syncs across all your devices in real-time. Access from anywhere, anytime.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Tools Section -->
+<section class="tools-section" id="tools">
+  <div class="container">
+    <h2>Available Tools</h2>
+    <div class="tools-grid">
+      <div class="tool-card" onclick="window.location.href='auth/login.html'">
+        <div style="font-size: 2.5rem; margin-bottom: 15px;">✅</div>
+        <h3>Smart Todo Manager</h3>
+        <p>Organize your tasks with priorities and due dates</p>
+      </div>
+      <div class="tool-card coming-soon">
+        <div style="font-size: 2.5rem; margin-bottom: 15px;">📄</div>
+        <h3>JSON Formatter</h3>
+        <p style="font-size: 0.9rem;">Coming Soon</p>
+      </div>
+      <div class="tool-card coming-soon">
+        <div style="font-size: 2.5rem; margin-bottom: 15px;">🧮</div>
+        <h3>Scientific Calculator</h3>
+        <p style="font-size: 0.9rem;">Coming Soon</p>
+      </div>
+      <div class="tool-card coming-soon">
+        <div style="font-size: 2.5rem; margin-bottom: 15px;">🔧</div>
+        <h3>More Tools</h3>
+        <p style="font-size: 0.9rem;">Coming Soon</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer>
+  <p>&copy; 2026 XQXing-Plushy. All rights reserved.</p>
+  <p>Built with ❤️ for productivity</p>
+</footer>
+
+</body>
+</html>

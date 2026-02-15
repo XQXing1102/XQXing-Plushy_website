@@ -41,6 +41,20 @@ def init_db():
 
 init_db()
 
+# Landing page (public - no auth needed)
+@app.route("/", methods=["GET"])
+def home():
+    return jsonify({
+        "message": "Welcome to XQXing-Plushy!",
+        "description": "All online tools in one place",
+        "tools": ["Smart Todo Manager", "JSON Formatter", "Scientific Calculator"],
+        "endpoints": {
+            "register": "/register",
+            "login": "/login",
+            "todos": "/todos"
+        }
+    }), 200
+
 # Helper function to verify JWT token and get user_id
 def verify_token(token):
     try:
@@ -166,6 +180,8 @@ def update_todo(id):
     conn.commit()
     conn.close()
     return jsonify({"message": "Updated"})
+
+
 
 # Delete task
 @app.route("/todos/<int:id>", methods=["DELETE"])
