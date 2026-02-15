@@ -74,13 +74,18 @@ async function addTask() {
       body: JSON.stringify({ title, priority, due_date: dueDate }),
     });
 
+    const data = await res.json();
+
     if (res.ok) {
       document.getElementById("title").value = "";
+      document.getElementById("dueDate").value = "";
       fetchTodos();
     } else {
-      alert("Failed to add task");
+      alert("Error: " + (data.message || "Failed to add task"));
+      console.error("Response:", data);
     }
   } catch (error) {
+    alert("Error connecting to server: " + error.message);
     console.error("Error adding task:", error);
   }
 }

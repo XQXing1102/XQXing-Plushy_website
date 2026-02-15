@@ -131,14 +131,22 @@ def add_todo():
         return jsonify({"message": "Unauthorized"}), 401
 
     data = request.json
-    conn = get_db()
-    conn.execute(
-        "INSERT INTO todos (user_id, title, priority, due_date) VALUES (?, ?, ?, ?)",
-        (user_id, data["title"], data["priority"], data["due_date"])
-    )
-    conn.commit()
-    conn.close()
-    return jsonify({"message": "Task added"})
+    
+    # Validate required fields
+    if not data.get("title") or not data.get("priority"):
+        return jsonify({"message": "Missing title or priority"}), 400
+    
+    try:
+        conn = get_db()
+        conn.execute(
+            "INSERT INTO todos (user_id, title, priority, due_date) VALUES (?, ?, ?, ?)",
+            (user_id, data["title"], data["priority"], data.get("due_date", ""))
+        )
+        conn.commit()
+        conn.close()
+        return jsonify({"message": "Task added"}), 201
+    except Exception as e:
+        return jsonify({"message": f"Error adding task: {str(e)}"}), 500
 
 @app.route("/todos/<int:id>", methods=["PUT"])
 def update_todo(id):
