@@ -1,9 +1,13 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import sqlite3
+import jwt
+from werkzeug.security import generate_password_hash, check_password_hash
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
 CORS(app)
+app.config['SECRET_KEY'] = 'XQXing&piyushzu'
 
 def get_db():
     conn = sqlite3.connect("database.db")
@@ -13,12 +17,23 @@ def get_db():
 def init_db():
     conn = get_db()
     conn.execute("""
+    CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT UNIQUE NOT NULL,
+        email TEXT UNIQUE NOT NULL,
+        password TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+    conn.execute("""
     CREATE TABLE IF NOT EXISTS todos (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
         title TEXT,
         priority TEXT,
         due_date TEXT,
-        completed INTEGER DEFAULT 0
+        completed INTEGER DEFAULT 0,
+        FOREIGN KEY (user_id) REFERENCES users(id)
     )
     """)
     conn.commit()
@@ -26,20 +41,94 @@ def init_db():
 
 init_db()
 
+# Helper function to verify JWT token and get user_id
+def verify_token(token):
+    try:
+        payload = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
+        return payload['user_id']
+    except jwt.ExpiredSignatureError:
+        return None
+    except jwt.InvalidTokenError:
+        return None
+
+# Register endpoint
+@app.route("/register", methods=["POST"])
+def register():
+    data = request.json
+    username = data.get("username")
+    email = data.get("email")
+    password = data.get("password")
+
+    if not username or not email or not password:
+        return jsonify({"message": "Missing required fields"}), 400
+
+    try:
+        conn = get_db()
+        hashed_password = generate_password_hash(password)
+        conn.execute(
+            "INSERT INTO users (username, email, password) VALUES (?, ?, ?)",
+            (username, email, hashed_password)
+        )
+        conn.commit()
+        conn.close()
+        return jsonify({"message": "User registered successfully"}), 201
+    except sqlite3.IntegrityError:
+        return jsonify({"message": "Username or email already exists"}), 400
+
+# Login endpoint
+@app.route("/login", methods=["POST"])
+def login():
+    data = request.json
+    username = data.get("username")
+    password = data.get("password")
+
+    if not username or not password:
+        return jsonify({"message": "Missing username or password"}), 400
+
+    conn = get_db()
+    user = conn.execute("SELECT * FROM users WHERE username=?", (username,)).fetchone()
+    conn.close()
+
+    if user and check_password_hash(user["password"], password):
+        token = jwt.encode(
+            {
+                "user_id": user["id"],
+                "username": user["username"],
+                "exp": datetime.utcnow() + timedelta(days=7)
+            },
+            app.config['SECRET_KEY'],
+            algorithm='HS256'
+        )
+        return jsonify({"token": token, "message": "Login successful"}), 200
+    else:
+        return jsonify({"message": "Invalid username or password"}), 401
+
 @app.route("/todos", methods=["GET"])
 def get_todos():
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    user_id = verify_token(token)
+
+    if not user_id:
+        return jsonify({"message": "Unauthorized"}), 401
+
     conn = get_db()
-    todos = conn.execute("SELECT * FROM todos ORDER BY id DESC").fetchall()
+    todos = conn.execute("SELECT * FROM todos WHERE user_id=? ORDER BY id DESC", (user_id,)).fetchall()
     conn.close()
     return jsonify([dict(row) for row in todos])
 
 @app.route("/todos", methods=["POST"])
 def add_todo():
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    user_id = verify_token(token)
+
+    if not user_id:
+        return jsonify({"message": "Unauthorized"}), 401
+
     data = request.json
     conn = get_db()
     conn.execute(
-        "INSERT INTO todos (title, priority, due_date) VALUES (?, ?, ?)",
-        (data["title"], data["priority"], data["due_date"])
+        "INSERT INTO todos (user_id, title, priority, due_date) VALUES (?, ?, ?, ?)",
+        (user_id, data["title"], data["priority"], data["due_date"])
     )
     conn.commit()
     conn.close()
@@ -47,22 +136,32 @@ def add_todo():
 
 @app.route("/todos/<int:id>", methods=["PUT"])
 def update_todo(id):
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    user_id = verify_token(token)
+
+    if not user_id:
+        return jsonify({"message": "Unauthorized"}), 401
+
     data = request.json
     conn = get_db()
 
-    # get old values if blank update request
-    old = conn.execute("SELECT * FROM todos WHERE id=?", (id,)).fetchone()
+    # Check if todo belongs to user
+    todo = conn.execute("SELECT * FROM todos WHERE id=? AND user_id=?", (id, user_id)).fetchone()
+    if not todo:
+        conn.close()
+        return jsonify({"message": "Todo not found"}), 404
 
-    title = data.get("title") if data.get("title") else old["title"]
-    priority = data.get("priority") if data.get("priority") else old["priority"]
-    due_date = data.get("due_date") if data.get("due_date") else old["due_date"]
+    # get old values if blank update request
+    title = data.get("title") if data.get("title") else todo["title"]
+    priority = data.get("priority") if data.get("priority") else todo["priority"]
+    due_date = data.get("due_date") if data.get("due_date") else todo["due_date"]
     completed = data.get("completed")
 
     conn.execute("""
         UPDATE todos 
         SET title=?, priority=?, due_date=?, completed=? 
-        WHERE id=?
-    """, (title, priority, due_date, completed, id))
+        WHERE id=? AND user_id=?
+    """, (title, priority, due_date, completed, id, user_id))
 
     conn.commit()
     conn.close()
@@ -71,11 +170,23 @@ def update_todo(id):
 # Delete task
 @app.route("/todos/<int:id>", methods=["DELETE"])
 def delete_todo(id):
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    user_id = verify_token(token)
+
+    if not user_id:
+        return jsonify({"message": "Unauthorized"}), 401
+
     conn = get_db()
-    conn.execute("DELETE FROM todos WHERE id=?", (id,))
+    # Check if todo belongs to user
+    todo = conn.execute("SELECT * FROM todos WHERE id=? AND user_id=?", (id, user_id)).fetchone()
+    if not todo:
+        conn.close()
+        return jsonify({"message": "Todo not found"}), 404
+
+    conn.execute("DELETE FROM todos WHERE id=? AND user_id=?", (id, user_id))
     conn.commit()
     conn.close()
     return jsonify({"message": "Deleted"})
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=True,port="9999")

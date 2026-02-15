@@ -1,14 +1,56 @@
 <!DOCTYPE html>
 <html>
+<head>
 <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>XQXing-Plushy</title>
+  <title>XQXing-Plushy - Todo Manager</title>
   <link rel="stylesheet" href="css/style.css">
+  <style>
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .header-buttons {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    .back {
+      padding: 8px 16px;
+      background: #3498db;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      text-decoration: none;
+    }
+    .back:hover {
+      background: #2980b9;
+    }
+    .logout-btn {
+      padding: 8px 16px;
+      background: #e74c3c;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      text-decoration: none;
+    }
+    .logout-btn:hover {
+      background: #c0392b;
+    }
+  </style>
+</head>
 <body>
 
 <header>
   <h1>Todo Manager</h1>
-  <a href="index.html" class="back">Back</a>
+  <div class="header-buttons">
+    <span id="username-display"></span>
+    <a href="index.html" class="back">Back</a>
+    <button class="logout-btn" onclick="logout()">Logout</button>
+  </div>
 </header>
 
 <div class="container">
@@ -30,7 +72,17 @@
 
 </div>
 
+<script src="auth/auth.js"></script>
 <script src="js/todo.js"></script>
 <script src="js/main.js"></script>
+<script>
+  // Check if user is logged in
+  if (!isLoggedIn()) {
+    window.location.href = "auth/login.html";
+  } else {
+    document.getElementById("username-display").textContent = "Welcome, " + getUsername();
+  }
+</script>
 </body>
 </html>
+

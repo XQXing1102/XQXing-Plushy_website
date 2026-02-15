@@ -1,39 +1,63 @@
 const API = "http://127.0.0.1:5000/todos";
 
+// Helper function to get authorization headers
+function getAuthHeaders() {
+  const token = getToken();
+  return {
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${token}`
+  };
+}
+
 async function fetchTodos() {
-  const res = await fetch(API);
-  const data = await res.json();
+  try {
+    const res = await fetch(API, {
+      headers: getAuthHeaders()
+    });
+    
+    if (!res.ok) {
+      if (res.status === 401) {
+        // Unauthorized - redirect to login
+        window.location.href = "auth/login.html";
+      }
+      return;
+    }
 
-  const list = document.getElementById("todoList");
-  list.innerHTML = "";
+    const data = await res.json();
 
-  data.forEach((todo) => {
-    const li = document.createElement("li");
+    const list = document.getElementById("todoList");
+    list.innerHTML = "";
 
-    let priorityClass = "";
-    if (todo.priority === "High") priorityClass = "priority-high";
-    if (todo.priority === "Medium") priorityClass = "priority-medium";
-    if (todo.priority === "Low") priorityClass = "priority-low";
+    data.forEach((todo) => {
+      const li = document.createElement("li");
 
-    li.innerHTML = `
-            <div>
-              <b>${todo.title}</b> 
-              <span class="${priorityClass}">(${todo.priority})</span>
-              <br>
-              <small>Due: ${todo.due_date || "No date"}</small>
-            </div>
+      let priorityClass = "";
+      if (todo.priority === "High") priorityClass = "priority-high";
+      if (todo.priority === "Medium") priorityClass = "priority-medium";
+      if (todo.priority === "Low") priorityClass = "priority-low";
 
-            <div>
-              <button onclick="completeTask(${todo.id},${todo.completed})">✔</button>
-              <button onclick="deleteTask(${todo.id})">🗑</button>
-            </div>
-        `;
+      li.innerHTML = `
+              <div>
+                <b>${todo.title}</b> 
+                <span class="${priorityClass}">(${todo.priority})</span>
+                <br>
+                <small>Due: ${todo.due_date || "No date"}</small>
+              </div>
 
-    if (todo.completed) li.style.opacity = "0.5";
+              <div>
+                <button onclick="completeTask(${todo.id},${todo.completed})">✔</button>
+                <button onclick="deleteTask(${todo.id})">🗑</button>
+              </div>
+          `;
 
-    list.appendChild(li);
-    checkNotification(todo);
-  });
+      if (todo.completed) li.style.opacity = "0.5";
+
+      list.appendChild(li);
+      checkNotification(todo);
+    });
+  } catch (error) {
+    console.error("Error fetching todos:", error);
+  }
 }
 
 async function addTask() {
@@ -43,30 +67,59 @@ async function addTask() {
 
   if (!title) return alert("Enter task");
 
-  await fetch(API, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ title, priority, due_date: dueDate }),
-  });
+  try {
+    const res = await fetch(API, {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ title, priority, due_date: dueDate }),
+    });
 
-  document.getElementById("title").value = "";
-  fetchTodos();
+    if (res.ok) {
+      document.getElementById("title").value = "";
+      fetchTodos();
+    } else {
+      alert("Failed to add task");
+    }
+  } catch (error) {
+    console.error("Error adding task:", error);
+  }
 }
 
 async function deleteTask(id) {
-  await fetch(API + "/" + id, { method: "DELETE" });
-  fetchTodos();
+  try {
+    const res = await fetch(API + "/" + id, { 
+      method: "DELETE",
+      headers: getAuthHeaders()
+    });
+    
+    if (res.ok) {
+      fetchTodos();
+    } else {
+      alert("Failed to delete task");
+    }
+  } catch (error) {
+    console.error("Error deleting task:", error);
+  }
 }
 
 async function completeTask(id, completed) {
-  await fetch(API + "/" + id, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      completed: completed ? 0 : 1,
-    }),
-  });
-  fetchTodos();
+  try {
+    const res = await fetch(API + "/" + id, {
+      method: "PUT",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({
+        completed: completed ? 0 : 1,
+      }),
+    });
+    
+    if (res.ok) {
+      fetchTodos();
+    } else {
+      alert("Failed to update task");
+    }
+  } catch (error) {
+    console.error("Error updating task:", error);
+  }
 }
 
 /* 🔔 Notification */
