@@ -1,13 +1,19 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Login - XQXing-Plushy</title>
-  <link rel="stylesheet" href="/css/style.css">
-  <link rel="stylesheet" href="/auth/auth.css">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="auth.css">
 </head>
 <body>
+
+<div class="blob-c">
+  <div class="blob bg-a"></div>
+  <div class="blob bg-b"></div>
+  <div class="blob bg-c"></div>
+</div>
 
 <div class="auth-container">
   <div class="auth-card">
@@ -16,15 +22,34 @@
     <form onsubmit="handleLogin(event)">
       <input type="text" id="username" placeholder="Username" required>
       <input type="password" id="password" placeholder="Password" required>
-      <button type="submit">Login</button>
+      
+      <button type="submit" class="liquid-btn">
+        <span>Login</span>
+      </button>
     </form>
 
     <p id="error-message" class="error"></p>
     
-    <p>Don't have an account? <a href="/auth/register.html">Register here</a></p>
+    <p class="footer-text">Don't have an account? <a href="register.html">Register here</a></p>
   </div>
 </div>
 
-<script src="/auth/auth.js"></script>
+<script src="../js/main.js"></script>
+<script src="auth.js"></script>
+<script>
+  window.addEventListener('DOMContentLoaded', () => {
+    const card = document.querySelector('.auth-card');
+    setTimeout(() => card.classList.add('visible'), 150);
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    const card = document.querySelector('.auth-card');
+    if (card) {
+      const x = (window.innerWidth / 2 - e.pageX) / 65;
+      const y = (window.innerHeight / 2 - e.pageY) / 65;
+      card.style.transform = `rotateY(${x}deg) rotateX(${y}deg)`;
+    }
+  });
+</script>
 </body>
 </html>

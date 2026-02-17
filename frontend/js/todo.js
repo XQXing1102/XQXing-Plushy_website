@@ -1,6 +1,5 @@
 const TODO_API = "http://127.0.0.1:9999/todos";
 
-// Helper function to get authorization headers
 function getAuthHeaders() {
   const token = getToken();
   return {
@@ -17,7 +16,6 @@ async function fetchTodos() {
 
     if (!res.ok) {
       if (res.status === 401) {
-        // Unauthorized - redirect to login
         window.location.href = "auth/login.html";
       }
       return;
@@ -53,10 +51,10 @@ async function fetchTodos() {
       if (todo.completed) li.style.opacity = "0.5";
 
       list.appendChild(li);
+      setTimeout(() => li.classList.add("enter"), 20);
       checkNotification(todo);
     });
 
-    // Attach event listeners to dynamically created buttons
     document.querySelectorAll(".completeBtn").forEach((btn) => {
       btn.addEventListener("click", function () {
         const id = this.getAttribute("data-id");
@@ -77,36 +75,34 @@ async function fetchTodos() {
 }
 
 async function addTask() {
-  console.log("addTask called"); // DEBUG
+  console.log("addTask called");
   const title = document.getElementById("title").value;
   const priority = document.getElementById("priority").value;
   const dueDate = document.getElementById("dueDate").value;
 
-  console.log("Task data:", { title, priority, dueDate }); // DEBUG
+  console.log("Task data:", { title, priority, dueDate });
 
   if (!title) return alert("Enter task");
 
   try {
-    console.log("Sending request to API:", TODO_API); // DEBUG
+    console.log("Sending request to API:", TODO_API);
     const res = await fetch(TODO_API, {
       method: "POST",
       headers: getAuthHeaders(),
       body: JSON.stringify({ title, priority, due_date: dueDate }),
     });
 
-    console.log("Response status:", res.status); // DEBUG
+    console.log("Response status:", res.status);
 
     if (res.ok) {
       document.getElementById("title").value = "";
-      document.getElementById("dueDate").value = "";
       fetchTodos();
     } else {
       const errorData = await res.json();
-      console.error("API Error:", errorData); // DEBUG
+      console.error("API Error:", errorData);
       alert("Failed to add task");
     }
   } catch (error) {
-    alert("Error connecting to server: " + error.message);
     console.error("Error adding task:", error);
   }
 }
@@ -148,7 +144,6 @@ async function completeTask(id, completed) {
   }
 }
 
-/* 🔔 Notification */
 function checkNotification(todo) {
   if (!todo.due_date) return;
 
@@ -165,16 +160,50 @@ if (Notification.permission !== "granted") {
   Notification.requestPermission();
 }
 
-// Attach event listeners after DOM is loaded
 document.addEventListener("DOMContentLoaded", () => {
-  console.log("DOMContentLoaded fired"); // DEBUG
+  console.log("DOMContentLoaded fired");
   const addTaskButton = document.getElementById("addTaskButton");
-  console.log("addTaskButton element:", addTaskButton); // DEBUG
+  console.log("addTaskButton element:", addTaskButton);
   if (addTaskButton) {
     addTaskButton.addEventListener("click", addTask);
-    console.log("Attached click listener to addTaskButton"); // DEBUG
+    console.log("Attached click listener to addTaskButton");
   } else {
-    console.error("addTaskButton not found!"); // DEBUG
+    console.error("addTaskButton not found!");
   }
   fetchTodos();
 });
+
+(function () {
+  function ripple(btn, x, y) {
+    const r = document.createElement("span");
+    r.className = "ripple";
+    r.style.left = x + "px";
+    r.style.top = y + "px";
+    r.style.position = "absolute";
+    r.style.pointerEvents = "none";
+    btn.style.position = btn.style.position || "relative";
+    btn.appendChild(r);
+    setTimeout(() => r.remove(), 600);
+  }
+
+  document.addEventListener("click", (e) => {
+    const btn = e.target.closest(".floating-btn");
+    if (btn) {
+      const rect = btn.getBoundingClientRect();
+      ripple(btn, e.clientX - rect.left, e.clientY - rect.top);
+    }
+  });
+
+  document.addEventListener("DOMContentLoaded", () => {
+    document
+      .querySelectorAll("#todoList li")
+      .forEach((it, i) => setTimeout(() => it.classList.add("enter"), i * 40));
+  });
+})();
+
+const _style = document.createElement("style");
+_style.innerHTML = `
+.ripple{position:absolute;border-radius:50%;transform:scale(0);background:rgba(255,255,255,0.4);animation:ripple 600ms ease-out;width:120px;height:120px;margin-left:-60px;margin-top:-60px;opacity:0.9}
+@keyframes ripple{to{transform:scale(1);opacity:0}}
+`;
+document.head.appendChild(_style);

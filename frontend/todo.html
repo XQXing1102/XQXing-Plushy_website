@@ -1,88 +1,179 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>XQXing-Plushy - Todo Manager</title>
-  <link rel="stylesheet" href="/css/style.css">
-  <style>
-    header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .header-buttons {
-      display: flex;
-      gap: 10px;
-      align-items: center;
-    }
-    .back {
-      padding: 8px 16px;
-      background: #3498db;
-      color: white;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-      text-decoration: none;
-    }
-    .back:hover {
-      background: #2980b9;
-    }
-    .logout-btn {
-      padding: 8px 16px;
-      background: #e74c3c;
-      color: white;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-      text-decoration: none;
-    }
-    .logout-btn:hover {
-      background: #c0392b;
-    }
-  </style>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>XQXing-Plushy • Todo Manager</title>
+
+<link rel="stylesheet" href="css/style.css">
+
+<style>
+.page-wrap{
+  width:100%;
+  max-width:900px;
+  margin:auto;
+}
+
+.todo-header{
+  width:100%;
+  margin-bottom:25px;
+  padding:12px 22px;
+  border-radius:18px;
+
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+
+  background:rgba(255,255,255,.07);
+  backdrop-filter:blur(25px);
+  border:1px solid rgba(255,255,255,.15);
+  color:white;
+}
+
+.todo-header h1{
+  font-size:18px;
+  margin:0;
+  font-weight:600;
+}
+
+.header-actions{
+  display:flex;
+  gap:12px;
+  align-items:center;
+  font-size:14px;
+}
+
+.glass-btn{
+  padding:6px 14px;
+  border-radius:10px;
+  border:1px solid rgba(255,255,255,.2);
+  background:rgba(255,255,255,.08);
+  color:white;
+  cursor:pointer;
+  text-decoration:none;
+  transition:.25s;
+  font-size:13px;
+}
+
+.glass-btn:hover{
+  background:rgba(255,255,255,.18);
+}
+
+.todo-card{
+  padding:20px;
+  border-radius:22px;
+  background:rgba(255,255,255,.06);
+  backdrop-filter:blur(25px);
+  border:1px solid rgba(255,255,255,.15);
+}
+
+.todo-input{
+  display:grid;
+  grid-template-columns:1fr 140px 160px 100px;
+  gap:10px;
+  margin-bottom:18px;
+}
+
+.todo-input input,
+.todo-input select{
+  padding:12px 14px;
+  border-radius:12px;
+  border:1px solid rgba(255,255,255,.2);
+  background:rgba(255,255,255,.08);
+  color:white;
+  outline:none;
+}
+
+.add-btn{
+  background:linear-gradient(45deg,#4f46e5,#7c3aed);
+  border:none;
+  color:white;
+  border-radius:12px;
+  cursor:pointer;
+  font-weight:600;
+}
+
+#todoList{
+  list-style:none;
+  padding:0;
+  margin:0;
+}
+
+#todoList li{
+  background:rgba(0,0,0,.45);
+  margin-bottom:10px;
+  padding:14px 16px;
+  border-radius:14px;
+  color:white;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  font-size:14px;
+}
+
+@media(max-width:700px){
+
+  .todo-input{
+    grid-template-columns:1fr;
+  }
+
+  .todo-header{
+    flex-direction:column;
+    gap:10px;
+    text-align:center;
+  }
+}
+</style>
 </head>
+
 <body>
 
-<header>
-  <h1>Todo Manager</h1>
-  <div class="header-buttons">
-    <span id="username-display"></span>
-    <a href="/index.html" class="back">Back</a>
-    <button class="logout-btn" onclick="logout()">Logout</button>
-  </div>
-</header>
+<div class="auth-container">
+<div class="page-wrap">
 
-<div class="container">
+  <div class="todo-header">
+    <h1>📝 Smart Todo Manager</h1>
 
-  <div class="todo-input">
-    <input type="text" id="title" placeholder="Enter task">
-
-    <select id="priority">
-      <option value="Low">Low</option>
-      <option value="Medium">Medium</option>
-      <option value="High">High</option>
-    </select>
-
-    <input type="date" id="dueDate">
-    <button id="addTaskButton">Add</button>
+    <div class="header-actions">
+      <span id="username-display"></span>
+      <a href="index.html" class="glass-btn">Dashboard</a>
+      <button class="glass-btn" onclick="logout()">Logout</button>
+    </div>
   </div>
 
-  <ul id="todoList"></ul>
+  <div class="todo-card">
+
+    <div class="todo-input">
+      <input type="text" id="title" placeholder="Enter task...">
+
+      <select id="priority">
+        <option value="Low">Low</option>
+        <option value="Medium">Medium</option>
+        <option value="High">High</option>
+      </select>
+
+      <input type="date" id="dueDate">
+      <button id="addTaskButton" class="add-btn">Add</button>
+    </div>
+
+    <ul id="todoList"></ul>
+
+  </div>
 
 </div>
+</div>
 
-<script src="/auth/auth.js"></script>
-<script src="/js/todo.js"></script>
-<script src="/js/main.js"></script>
+<script src="auth/auth.js"></script>
+<script src="js/todo.js"></script>
+<script src="js/main.js"></script>
+
 <script>
-  // Check if user is logged in
-  if (!isLoggedIn()) {
-    window.location.href = "auth/login.html";
-  } else {
-    document.getElementById("username-display").textContent = "Welcome, " + getUsername();
-  }
+if (!isLoggedIn()) {
+  window.location.href = "auth/login.html";
+} else {
+  document.getElementById("username-display").textContent = getUsername();
+}
 </script>
+
 </body>
 </html>
-

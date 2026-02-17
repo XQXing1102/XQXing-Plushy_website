@@ -1,68 +1,59 @@
-
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>XQXing-Plushy</title>
-  <link rel="stylesheet" href="/css/style.css">
-  <style>
-    header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .auth-buttons {
-      display: flex;
-      gap: 10px;
-      align-items: center;
-    }
-    .logout-btn {
-      padding: 8px 16px;
-      background: #e74c3c;
-      color: white;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-      text-decoration: none;
-    }
-    .logout-btn:hover {
-      background: #c0392b;
-    }
-  </style>
+  <title>Dashboard - XQXing-Plushy</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="auth/auth.css">
 </head>
 <body>
 
-<header>
-  <div>
-    <h1>XQXing-Plushy</h1>
-    <p>All online tools in one place</p>
-  </div>
-  <div class="auth-buttons">
-    <span id="username-display"></span>
-    <button class="logout-btn" onclick="logout()">Logout</button>
-  </div>
-</header>
+<div class="dashboard-container">
+  
+  <header class="glass-header">
+    <div class="brand">
+      <h1>XQXing-Plushy</h1>
+      <p>All online tools in one place</p>
+    </div>
+    
+    <div class="auth-profile" style="display: flex; align-items: center; gap: 15px;">
+      <span id="username-display" style="color: white; font-size: 14px;"></span>
+      <button class="liquid-btn" style="padding: 10px 20px; margin: 0; width: auto; height: 30px; font-size: 9px;" onclick="logout()">
+        <span>Logout</span>
+      </button>
+    </div>
+  </header>
 
-<div class="tools">
-
-  <a href="/todo.html" class="tool-card">
-    Smart Todo Manager
-  </a>
-
-  <div class="tool-card disabled">Something</div>
-  <div class="tool-card disabled">JSON Formatter</div>
-  <div class="tool-card disabled">Scientific Calculator</div>
+  <main class="tools-grid">
+    <a href="todo.html" class="tool-tile">
+      <div class="tile-core"><span>Smart Todo Manager</span></div>
+    </a>
+    <div class="tool-tile disabled">
+      <div class="tile-core"><span>Something</span></div>
+    </div>
+    <div class="tool-tile disabled">
+      <div class="tile-core"><span>JSON Formatter</span></div>
+    </div>
+    <div class="tool-tile disabled">
+      <div class="tile-core"><span>Scientific Calculator</span></div>
+    </div>
+  </main>
 
 </div>
 
-<script src="/auth/auth.js"></script>
+<script src="js/main.js"></script>
+<script src="auth/auth.js"></script>
 <script>
-  // Check if user is logged in
   if (!isLoggedIn()) {
     window.location.href = "auth/login.html";
   } else {
-    document.getElementById("username-display").textContent = "Welcome, " + getUsername();
+    document.getElementById("username-display").textContent = "Hi, " + getUsername();
+    setTimeout(() => {
+        document.querySelectorAll('.tool-tile, .glass-header').forEach(el => {
+            el.classList.add('visible');
+        });
+    }, 100);
   }
 </script>
 </body>
