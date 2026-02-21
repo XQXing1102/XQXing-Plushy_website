@@ -27,14 +27,25 @@ def init_db():
     )
     """)
     conn.execute("""
+    CREATE TABLE IF NOT EXISTS folders (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+    """)
+    conn.execute("""
     CREATE TABLE IF NOT EXISTS todos (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL,
+        folder_id INTEGER,
         title TEXT,
         priority TEXT,
         due_date TEXT,
         completed INTEGER DEFAULT 0,
-        FOREIGN KEY (user_id) REFERENCES users(id)
+        FOREIGN KEY (user_id) REFERENCES users(id),
+        FOREIGN KEY (folder_id) REFERENCES folders(id)
     )
     """)
     conn.commit()
@@ -71,12 +82,23 @@ def register():
     try:
         conn = get_db()
         hashed_password = generate_password_hash(password)
-        conn.execute(
+        cursor = conn.execute(
             "INSERT INTO users (username, email, password) VALUES (?, ?, ?)",
             (username, email, hashed_password)
         )
         conn.commit()
+        
+        # Get the newly created user_id
+        user_id = cursor.lastrowid
+        
+        # Create default "General" folder for new user
+        conn.execute(
+            "INSERT INTO folders (user_id, name) VALUES (?, ?)",
+            (user_id, "General")
+        )
+        conn.commit()
         conn.close()
+        
         return jsonify({"message": "User registered successfully"}), 201
     except sqlite3.IntegrityError:
         return jsonify({"message": "Username or email already exists"}), 400
@@ -117,8 +139,20 @@ def get_todos():
     if not user_id:
         return jsonify({"message": "Unauthorized"}), 401
 
+    folder_id = request.args.get("folder_id")
     conn = get_db()
-    todos = conn.execute("SELECT * FROM todos WHERE user_id=? ORDER BY id DESC", (user_id,)).fetchall()
+    
+    if folder_id:
+        todos = conn.execute(
+            "SELECT * FROM todos WHERE user_id=? AND folder_id=? ORDER BY id DESC", 
+            (user_id, folder_id)
+        ).fetchall()
+    else:
+        todos = conn.execute(
+            "SELECT * FROM todos WHERE user_id=? ORDER BY id DESC", 
+            (user_id,)
+        ).fetchall()
+    
     conn.close()
     return jsonify([dict(row) for row in todos])
 
@@ -139,8 +173,8 @@ def add_todo():
     try:
         conn = get_db()
         conn.execute(
-            "INSERT INTO todos (user_id, title, priority, due_date) VALUES (?, ?, ?, ?)",
-            (user_id, data["title"], data["priority"], data.get("due_date", ""))
+            "INSERT INTO todos (user_id, folder_id, title, priority, due_date) VALUES (?, ?, ?, ?, ?)",
+            (user_id, data.get("folder_id"), data["title"], data["priority"], data.get("due_date", ""))
         )
         conn.commit()
         conn.close()
@@ -201,6 +235,126 @@ def delete_todo(id):
     conn.commit()
     conn.close()
     return jsonify({"message": "Deleted"})
+
+# ===== FOLDER ENDPOINTS =====
+# Get all folders for user
+@app.route("/folders", methods=["GET"])
+def get_folders():
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    user_id = verify_token(token)
+
+    if not user_id:
+        return jsonify({"message": "Unauthorized"}), 401
+
+    conn = get_db()
+    folders = conn.execute(
+        "SELECT * FROM folders WHERE user_id=? ORDER BY created_at DESC", 
+        (user_id,)
+    ).fetchall()
+    
+    # If user has no folders, create default "General" folder
+    if not folders:
+        conn.execute(
+            "INSERT INTO folders (user_id, name) VALUES (?, ?)",
+            (user_id, "General")
+        )
+        conn.commit()
+        folders = conn.execute(
+            "SELECT * FROM folders WHERE user_id=? ORDER BY created_at DESC", 
+            (user_id,)
+        ).fetchall()
+    
+    conn.close()
+    return jsonify([dict(row) for row in folders])
+
+# Create new folder
+@app.route("/folders", methods=["POST"])
+def create_folder():
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    user_id = verify_token(token)
+
+    if not user_id:
+        return jsonify({"message": "Unauthorized"}), 401
+
+    data = request.json
+    name = data.get("name")
+
+    if not name:
+        return jsonify({"message": "Missing folder name"}), 400
+
+    try:
+        conn = get_db()
+        conn.execute(
+            "INSERT INTO folders (user_id, name) VALUES (?, ?)",
+            (user_id, name)
+        )
+        conn.commit()
+        conn.close()
+        return jsonify({"message": "Folder created"}), 201
+    except Exception as e:
+        return jsonify({"message": f"Error creating folder: {str(e)}"}), 500
+
+# Update/Rename folder
+@app.route("/folders/<int:id>", methods=["PUT"])
+def update_folder(id):
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    user_id = verify_token(token)
+
+    if not user_id:
+        return jsonify({"message": "Unauthorized"}), 401
+
+    data = request.json
+    name = data.get("name")
+
+    if not name:
+        return jsonify({"message": "Missing folder name"}), 400
+
+    conn = get_db()
+    # Check if folder belongs to user
+    folder = conn.execute(
+        "SELECT * FROM folders WHERE id=? AND user_id=?", 
+        (id, user_id)
+    ).fetchone()
+    
+    if not folder:
+        conn.close()
+        return jsonify({"message": "Folder not found"}), 404
+
+    conn.execute(
+        "UPDATE folders SET name=? WHERE id=? AND user_id=?",
+        (name, id, user_id)
+    )
+    conn.commit()
+    conn.close()
+    return jsonify({"message": "Folder updated"})
+
+# Delete folder
+@app.route("/folders/<int:id>", methods=["DELETE"])
+def delete_folder(id):
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    user_id = verify_token(token)
+
+    if not user_id:
+        return jsonify({"message": "Unauthorized"}), 401
+
+    conn = get_db()
+    # Check if folder belongs to user
+    folder = conn.execute(
+        "SELECT * FROM folders WHERE id=? AND user_id=?", 
+        (id, user_id)
+    ).fetchone()
+    
+    if not folder:
+        conn.close()
+        return jsonify({"message": "Folder not found"}), 404
+
+    # Delete all todos in this folder
+    conn.execute("DELETE FROM todos WHERE folder_id=? AND user_id=?", (id, user_id))
+    # Delete the folder itself
+    conn.execute("DELETE FROM folders WHERE id=? AND user_id=?", (id, user_id))
+    conn.commit()
+    conn.close()
+    return jsonify({"message": "Folder deleted"})
 
 # Serve frontend static files (must be AFTER all API routes)
 @app.route("/<path:filename>")
