@@ -44,26 +44,34 @@ class Calculator {
         const color = document.getElementById('graphColor').value || '#3b82f6';
         
         if (!input) {
-            alert('Enter an equation');
+            alert('Enter an equation or function');
             return;
         }
 
-        // Format for Desmos (handle both y = ... and just ...)
-        let equation = input;
-        if (!equation.includes('=')) {
-            equation = 'y = ' + equation;
-        }
-
         try {
+            // Accept y = f(x) or just f(x)
+            let equation = input;
+            
+            // If it doesn't contain '=', assume it's y = f(x)
+            if (!equation.includes('=')) {
+                equation = 'y = ' + equation;
+            }
+
+            // Validate by trying to evaluate at a test point
+            const testExpr = equation.split('=')[1].trim();
+            this.evaluateFunctionAt(testExpr, 'x', 0);
+
+            // Add to Desmos
             this.desmos.setExpression({
                 latex: equation,
                 color: color,
             });
+            
             this.currentGraphs.set(input, { latex: equation, color: color });
             document.getElementById('graphInput').value = '';
             document.getElementById('graphColor').value = '';
         } catch (e) {
-            alert('Invalid equation. Use valid Desmos syntax.');
+            alert('Invalid function. Make sure to use valid syntax like:\ny = x^2\ny = sin(x)\ny = 1/(x-2)\ny = sqrt(x)');
         }
     }
 
@@ -302,6 +310,175 @@ class Calculator {
         if (to === 'C') return celsius;
         if (to === 'F') return celsius * 9/5 + 32;
         if (to === 'K') return celsius + 273.15;
+    }
+
+    // ===== CALCULUS: NUMERICAL DIFFERENTIATION =====
+    differentiate(expr, variable = 'x', point, h = 0.0001) {
+        // Calculate f(x + h)
+        const f_plus = this.evaluateFunctionAt(expr, variable, point + h);
+        // Calculate f(x - h)
+        const f_minus = this.evaluateFunctionAt(expr, variable, point - h);
+        // Central difference formula: f'(x) ≈ (f(x+h) - f(x-h)) / (2h)
+        return (f_plus - f_minus) / (2 * h);
+    }
+
+    // ===== CALCULUS: NUMERICAL INTEGRATION =====
+    integrate(expr, variable = 'x', a, b, n = 1000) {
+        // Simpson's rule for numerical integration
+        const h = (b - a) / n;
+        let sum = this.evaluateFunctionAt(expr, variable, a) + this.evaluateFunctionAt(expr, variable, b);
+        
+        for (let i = 1; i < n; i++) {
+            const x = a + i * h;
+            const coeff = (i % 2 === 0) ? 2 : 4;
+            sum += coeff * this.evaluateFunctionAt(expr, variable, x);
+        }
+        
+        return (h / 3) * sum;
+    }
+
+    // Alternative: Trapezoidal rule
+    integrateTrapezoid(expr, variable = 'x', a, b, n = 1000) {
+        const h = (b - a) / n;
+        let sum = 0.5 * (this.evaluateFunctionAt(expr, variable, a) + this.evaluateFunctionAt(expr, variable, b));
+        
+        for (let i = 1; i < n; i++) {
+            const x = a + i * h;
+            sum += this.evaluateFunctionAt(expr, variable, x);
+        }
+        
+        return h * sum;
+    }
+
+    // ===== CALCULUS: LIMIT CALCULATION =====
+    limit(expr, variable = 'x', point, direction = 'both') {
+        // Approach from left
+        const left = this.evaluateFunctionAt(expr, variable, point - 0.0001);
+        // Approach from right
+        const right = this.evaluateFunctionAt(expr, variable, point + 0.0001);
+        
+        if (direction === 'left') return left.toFixed(8);
+        if (direction === 'right') return right.toFixed(8);
+        
+        // Check if limit exists (left ≈ right)
+        if (Math.abs(left - right) < 0.001) {
+            return (left + right) / 2;
+        }
+        return 'DNE'; // Does not exist
+    }
+
+    // ===== CALCULUS: TAYLOR SERIES =====
+    taylorSeries(expr, variable = 'x', center = 0, terms = 6) {
+        let result = 0;
+        const h = 0.001;
+        
+        for (let n = 0; n < terms; n++) {
+            // Approximate nth derivative using central differences
+            let derivative = this.evaluateFunctionAt(expr, variable, center);
+            for (let i = 0; i < n; i++) {
+                const f_plus = this.evaluateFunctionAt(expr, variable, center + h);
+                const f_minus = this.evaluateFunctionAt(expr, variable, center - h);
+                derivative = (f_plus - f_minus) / (2 * h);
+            }
+            
+            // Factorial
+            const fact = this.factorial(n);
+            result += (derivative / fact) * Math.pow(variable - center, n);
+        }
+        
+        return result;
+    }
+
+    // ===== CALCULUS: FIND CRITICAL POINTS =====
+    findCriticalPoints(expr, variable = 'x', start, end, step = 0.1) {
+        const criticalPoints = [];
+        const h = 0.0001;
+        
+        for (let x = start; x < end; x += step) {
+            const deriv = this.differentiate(expr, variable, x, h);
+            
+            // Critical point where derivative ≈ 0
+            if (Math.abs(deriv) < 0.01) {
+                criticalPoints.push({
+                    x: x.toFixed(4),
+                    y: this.evaluateFunctionAt(expr, variable, x).toFixed(4),
+                    derivative: deriv.toFixed(6)
+                });
+            }
+        }
+        
+        return criticalPoints;
+    }
+
+    // ===== CALCULUS: EXTREMA (MIN/MAX) =====
+    findExtrema(expr, variable = 'x', start, end, step = 0.1) {
+        let minPoint = { x: start, y: this.evaluateFunctionAt(expr, variable, start) };
+        let maxPoint = { x: start, y: this.evaluateFunctionAt(expr, variable, start) };
+        
+        for (let x = start + step; x < end; x += step) {
+            const y = this.evaluateFunctionAt(expr, variable, x);
+            
+            if (y < minPoint.y) minPoint = { x: x.toFixed(4), y: y.toFixed(4) };
+            if (y > maxPoint.y) maxPoint = { x: x.toFixed(4), y: y.toFixed(4) };
+        }
+        
+        return { min: minPoint, max: maxPoint };
+    }
+
+    // ===== CALCULUS: INFLECTION POINTS =====
+    findInflectionPoints(expr, variable = 'x', start, end, step = 0.1) {
+        const inflections = [];
+        const h = 0.001;
+        
+        for (let x = start; x < end; x += step) {
+            // Second derivative approximation
+            const f_plus = this.evaluateFunctionAt(expr, variable, x + h);
+            const f = this.evaluateFunctionAt(expr, variable, x);
+            const f_minus = this.evaluateFunctionAt(expr, variable, x - h);
+            
+            const secondDeriv = (f_plus - 2 * f + f_minus) / (h * h);
+            
+            // Check if second derivative changes sign
+            if (Math.abs(secondDeriv) < 0.01) {
+                inflections.push({
+                    x: x.toFixed(4),
+                    y: f.toFixed(4),
+                    secondDeriv: secondDeriv.toFixed(6)
+                });
+            }
+        }
+        
+        return inflections;
+    }
+
+    // ===== EVALUATE FUNCTION AT A POINT =====
+    evaluateFunctionAt(expr, variable = 'x', value) {
+        try {
+            // Replace variable with value
+            let evalExpr = expr.replace(new RegExp(variable, 'g'), `(${value})`);
+            
+            // Replace constants
+            evalExpr = evalExpr.replace(/π|pi/g, String(Math.PI));
+            evalExpr = evalExpr.replace(/e(?![a-zA-Z])/g, String(Math.E));
+            evalExpr = evalExpr.replace(/φ/g, '1.618033988749895');
+            
+            // Replace functions
+            evalExpr = evalExpr.replace(/sin\(/g, '(Math.sin(');
+            evalExpr = evalExpr.replace(/cos\(/g, '(Math.cos(');
+            evalExpr = evalExpr.replace(/tan\(/g, '(Math.tan(');
+            evalExpr = evalExpr.replace(/sqrt\(/g, '(Math.sqrt(');
+            evalExpr = evalExpr.replace(/log\(/g, '(Math.log10(');
+            evalExpr = evalExpr.replace(/ln\(/g, '(Math.log(');
+            evalExpr = evalExpr.replace(/abs\(/g, '(Math.abs(');
+            
+            // Fix unmatched parentheses
+            evalExpr += ')'.repeat((evalExpr.match(/\(/g) || []).length - (evalExpr.match(/\)/g) || []).length);
+            
+            const result = Function('"use strict"; return (' + evalExpr + ');')();
+            return result;
+        } catch (e) {
+            return NaN;
+        }
     }
 
     // ===== MATRIX OPERATIONS =====
@@ -625,6 +802,15 @@ class Calculator {
                 { label: 'C', fn: '2.998e8' },
                 { label: 'G', fn: '6.674e-11' },
             ],
+            calculus: [
+                { label: 'd/dx', action: 'showDifferentiateUI' },
+                { label: 'Integral', action: 'showIntegrateUI' },
+                { label: 'Limit', action: 'showLimitUI' },
+                { label: 'Taylor', action: 'showTaylorUI' },
+                { label: 'Critical Pts', action: 'showCriticalPointsUI' },
+                { label: 'Extrema', action: 'showExtremaUI' },
+                { label: 'Inflection', action: 'showInflectionUI' },
+            ],
         };
 
         // Store functions for tab switching
@@ -651,6 +837,13 @@ class Calculator {
                     else if (f.action === 'memorySubtract') this.memorySubtract();
                     else if (f.action === 'memoryClear') this.memoryClear();
                     else if (f.action === 'showQuadraticSolver') this.showQuadraticSolver();
+                    else if (f.action === 'showDifferentiateUI') this.showDifferentiateUI();
+                    else if (f.action === 'showIntegrateUI') this.showIntegrateUI();
+                    else if (f.action === 'showLimitUI') this.showLimitUI();
+                    else if (f.action === 'showTaylorUI') this.showTaylorUI();
+                    else if (f.action === 'showCriticalPointsUI') this.showCriticalPointsUI();
+                    else if (f.action === 'showExtremaUI') this.showExtremaUI();
+                    else if (f.action === 'showInflectionUI') this.showInflectionUI();
                     else if (f.action.includes('setAngleMode')) eval('this.' + f.action);
                 });
             } else if (f.fn) {
@@ -666,6 +859,102 @@ class Calculator {
 
             grid.appendChild(btn);
         });
+    }
+
+    // ===== CALCULUS UI METHODS =====
+    showDifferentiateUI() {
+        const expr = prompt('Enter function (use x as variable):\nExample: x^2, sin(x), 1/x');
+        if (!expr) return;
+        
+        const point = parseFloat(prompt('Find derivative at x = '));
+        if (isNaN(point)) return;
+        
+        const result = this.differentiate(expr, 'x', point);
+        this.expression = `f'(${point}) ≈ ${result.toFixed(8)}`;
+        this.updateDisplay();
+    }
+
+    showIntegrateUI() {
+        const expr = prompt('Enter function to integrate:\nExample: x^2, sin(x)');
+        if (!expr) return;
+        
+        const a = parseFloat(prompt('Lower limit (a):'));
+        if (isNaN(a)) return;
+        
+        const b = parseFloat(prompt('Upper limit (b):'));
+        if (isNaN(b)) return;
+        
+        const result = this.integrate(expr, 'x', a, b);
+        this.expression = `∫(${a} to ${b}) ${expr} dx ≈ ${result.toFixed(8)}`;
+        this.updateDisplay();
+    }
+
+    showLimitUI() {
+        const expr = prompt('Enter function:\nExample: sin(x)/x');
+        if (!expr) return;
+        
+        const point = parseFloat(prompt('Find limit as x approaches:'));
+        if (isNaN(point)) return;
+        
+        const result = this.limit(expr, 'x', point);
+        this.expression = `lim(x→${point}) ${expr} ≈ ${result}`;
+        this.updateDisplay();
+    }
+
+    showTaylorUI() {
+        const expr = prompt('Enter function:\nExample: sin(x), e^x');
+        if (!expr) return;
+        
+        const center = parseFloat(prompt('Expand around x = (default 0):', '0'));
+        const terms = parseInt(prompt('Number of terms (default 6):', '6'));
+        
+        const result = this.taylorSeries(expr, 'x', center || 0, terms || 6);
+        this.expression = `Taylor(${expr} @ x=${center || 0}, ${terms || 6} terms) ≈ ${result.toFixed(10)}`;
+        this.updateDisplay();
+    }
+
+    showCriticalPointsUI() {
+        const expr = prompt('Enter function:\nExample: x^3 - 3x');
+        if (!expr) return;
+        
+        const start = parseFloat(prompt('Start x:', '-10'));
+        const end = parseFloat(prompt('End x:', '10'));
+        
+        const points = this.findCriticalPoints(expr, 'x', start || -10, end || 10);
+        const result = points.length > 0 
+            ? points.map(p => `(${p.x}, ${p.y})`).join(', ')
+            : 'No critical points found';
+        
+        this.expression = `Critical Points: ${result}`;
+        this.updateDisplay();
+    }
+
+    showExtremaUI() {
+        const expr = prompt('Enter function:\nExample: x^2 - 4x + 3');
+        if (!expr) return;
+        
+        const start = parseFloat(prompt('Start x:', '-10'));
+        const end = parseFloat(prompt('End x:', '10'));
+        
+        const extrema = this.findExtrema(expr, 'x', start || -10, end || 10);
+        this.expression = `Min: (${extrema.min.x}, ${extrema.min.y}), Max: (${extrema.max.x}, ${extrema.max.y})`;
+        this.updateDisplay();
+    }
+
+    showInflectionUI() {
+        const expr = prompt('Enter function:\nExample: x^3 - 6x^2 + 9x');
+        if (!expr) return;
+        
+        const start = parseFloat(prompt('Start x:', '-10'));
+        const end = parseFloat(prompt('End x:', '10'));
+        
+        const points = this.findInflectionPoints(expr, 'x', start || -10, end || 10);
+        const result = points.length > 0 
+            ? points.map(p => `(${p.x}, ${p.y})`).join(', ')
+            : 'No inflection points found';
+        
+        this.expression = `Inflection Points: ${result}`;
+        this.updateDisplay();
     }
 
     showQuadraticSolver() {
