@@ -8,12 +8,18 @@
 <link rel="stylesheet" href="css/style.css">
 
 <style>
+
+/* =========================
+   🔥 iOS GLASS TODO UI FULL
+========================= */
+
 .page-wrap{
   width:100%;
   max-width:900px;
   margin:auto;
 }
 
+/* ===== HEADER ===== */
 .todo-header{
   width:100%;
   margin-bottom:25px;
@@ -43,22 +49,133 @@
   font-size:14px;
 }
 
-.glass-btn{
-  padding:6px 14px;
-  border-radius:10px;
-  border:1px solid rgba(255,255,255,.2);
-  background:rgba(255,255,255,.08);
-  color:white;
-  cursor:pointer;
-  text-decoration:none;
-  transition:.25s;
-  font-size:13px;
+/* ===============================
+   🔥 UNIVERSAL GLASS INPUTS
+================================ */
+.todo-input{
+  display:grid;
+  grid-template-columns:1fr 140px 160px 110px;
+  gap:12px;
+  margin-bottom:18px;
 }
 
-.glass-btn:hover{
-  background:rgba(255,255,255,.18);
+.todo-input input,
+.todo-input select{
+    height:44px;
+    padding:0 14px;
+    border-radius:14px;
+    border:none;
+    outline:none;
+    color:#fff;
+    font-size:14px;
+
+    background:rgba(255,255,255,.10);
+    backdrop-filter:blur(20px);
+    -webkit-backdrop-filter:blur(20px);
+
+    box-shadow:
+      inset 0 1px 1px rgba(255,255,255,.25),
+      0 6px 18px rgba(0,0,0,.35);
+
+    transition:.35s;
 }
 
+.todo-input input::placeholder{
+  color:rgba(255,255,255,.6);
+}
+
+.todo-input input:focus,
+.todo-input select:focus{
+    background:rgba(255,255,255,.18);
+    box-shadow:
+      0 0 0 1px rgba(255,255,255,.4),
+      0 10px 25px rgba(0,0,0,.5);
+}
+
+/* ===============================
+   🔥 UNIVERSAL GLASS BUTTON
+================================ */
+.glass-btn,
+button{
+    height:42px;
+    padding:0 16px;
+    border-radius:14px;
+    border:none;
+    cursor:pointer;
+    position:relative;
+    overflow:hidden;
+    color:#fff;
+    font-weight:600;
+    letter-spacing:.4px;
+
+    background:rgba(255,255,255,.12);
+    backdrop-filter:blur(25px);
+    -webkit-backdrop-filter:blur(25px);
+
+    box-shadow:
+      inset 0 1px 1px rgba(255,255,255,.25),
+      0 8px 20px rgba(0,0,0,.35);
+
+    transition:.35s cubic-bezier(.2,.9,.25,1);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+}
+
+/* inner glass */
+.glass-btn::before,
+button::before{
+    content:"";
+    position:absolute;
+    inset:2px;
+    border-radius:12px;
+    background:rgba(0,0,0,.45);
+    backdrop-filter:blur(30px);
+    z-index:0;
+}
+
+.glass-btn span,
+button span{
+    position:relative;
+    z-index:2;
+}
+
+/* hover */
+.glass-btn:hover,
+button:hover{
+    transform:translateY(-2px) scale(1.03);
+    box-shadow:
+      inset 0 1px 1px rgba(255,255,255,.35),
+      0 14px 30px rgba(0,0,0,.5);
+}
+
+/* click */
+.glass-btn:active,
+button:active{
+    transform:scale(.95);
+}
+
+/* shine */
+.glass-btn::after,
+button::after{
+    content:"";
+    position:absolute;
+    top:0;
+    left:-120%;
+    width:60%;
+    height:100%;
+    background:linear-gradient(120deg,transparent,rgba(255,255,255,.4),transparent);
+    transition:.6s;
+}
+
+.glass-btn:hover::after,
+button:hover::after{
+    left:140%;
+}
+
+/* ===============================
+   TODO CARD
+================================ */
 .todo-card{
   padding:20px;
   border-radius:22px;
@@ -67,32 +184,9 @@
   border:1px solid rgba(255,255,255,.15);
 }
 
-.todo-input{
-  display:grid;
-  grid-template-columns:1fr 140px 160px 100px;
-  gap:10px;
-  margin-bottom:18px;
-}
-
-.todo-input input,
-.todo-input select{
-  padding:12px 14px;
-  border-radius:12px;
-  border:1px solid rgba(255,255,255,.2);
-  background:rgba(255,255,255,.08);
-  color:white;
-  outline:none;
-}
-
-.add-btn{
-  background:linear-gradient(45deg,#4f46e5,#7c3aed);
-  border:none;
-  color:white;
-  border-radius:12px;
-  cursor:pointer;
-  font-weight:600;
-}
-
+/* ===============================
+   LIST STYLE
+================================ */
 #todoList{
   list-style:none;
   padding:0;
@@ -100,17 +194,33 @@
 }
 
 #todoList li{
-  background:rgba(0,0,0,.45);
-  margin-bottom:10px;
+  background:rgba(0,0,0,.35);
+  backdrop-filter:blur(25px);
+  border:1px solid rgba(255,255,255,.12);
+  box-shadow:0 8px 20px rgba(0,0,0,.4);
+
+  margin-bottom:12px;
   padding:14px 16px;
-  border-radius:14px;
+  border-radius:16px;
   color:white;
+
   display:flex;
   justify-content:space-between;
   align-items:center;
   font-size:14px;
 }
 
+/* small action buttons */
+.completeBtn,
+.deleteBtn{
+    width:38px;
+    height:38px;
+    border-radius:12px;
+}
+
+/* ===============================
+   MOBILE
+================================ */
 @media(max-width:700px){
 
   .todo-input{
@@ -123,7 +233,9 @@
     text-align:center;
   }
 }
+
 </style>
+
 </head>
 
 <body>
@@ -153,7 +265,10 @@
       </select>
 
       <input type="date" id="dueDate">
-      <button id="addTaskButton" class="add-btn">Add</button>
+      <button id="addTaskButton" class="ios-glass-btn">
+      <span>Add</span>
+</button>
+
     </div>
 
     <ul id="todoList"></ul>
