@@ -7,8 +7,11 @@ class Calculator {
     constructor() {
         this.expression = '';
         this.result = '0';
+        this.lastAnswer = null;  // ANS
         this.history = [];
         this.memory = 0;
+        this.variables = {};  // A-Z, M (separate from memory for M+)
+        this.statsList = [];  // For mean, median, mode, σ, etc.
         this.angleMode = 'degree'; // degree, radian, grad
         this.displayMode = 'fix'; // fix, sci, eng
         this.decimalPlaces = 10;
@@ -199,6 +202,23 @@ class Calculator {
     sec(x) { return 1 / Math.cos(this.toRadians(x)); }
     csc(x) { return 1 / Math.sin(this.toRadians(x)); }
     cot(x) { return 1 / Math.tan(this.toRadians(x)); }
+    asec(x) { return this.fromRadians(Math.acos(1 / x)); }
+    acsc(x) { return this.fromRadians(Math.asin(1 / x)); }
+    acot(x) { return this.fromRadians(Math.atan(1 / x)); }
+    asinh(x) { return Math.asinh(x); }
+    acosh(x) { return Math.acosh(x); }
+    atanh(x) { return Math.atanh(x); }
+
+    // ===== ANGLE DMS (Degrees-Minutes-Seconds) =====
+    toDMS(deg) {
+        const d = Math.floor(deg);
+        const m = Math.floor((deg - d) * 60);
+        const s = ((deg - d) * 60 - m) * 60;
+        return { d, m, s };
+    }
+    fromDMS(d, m, s) {
+        return d + m / 60 + s / 3600;
+    }
 
     // ===== LOGARITHMIC & EXPONENTIAL =====
     log10(x) { return Math.log10(x); }
@@ -250,6 +270,45 @@ class Calculator {
         const variance = arr.reduce((sum, val) => sum + Math.pow(val - avg, 2), 0) / arr.length;
         return Math.sqrt(variance);
     }
+    variance(arr) {
+        const avg = this.mean(arr);
+        return arr.reduce((sum, val) => sum + Math.pow(val - avg, 2), 0) / arr.length;
+    }
+    mode(arr) {
+        const freq = {};
+        arr.forEach(v => { freq[v] = (freq[v] || 0) + 1; });
+        let maxF = 0, modes = [];
+        for (const k in freq) {
+            if (freq[k] > maxF) { maxF = freq[k]; modes = [parseFloat(k)]; }
+            else if (freq[k] === maxF) modes.push(parseFloat(k));
+        }
+        return modes.length === arr.length ? [] : modes;
+    }
+    sumSquares(arr) {
+        return arr.reduce((sum, val) => sum + val * val, 0);
+    }
+    weightedMean(values, weights) {
+        const total = weights.reduce((a, b) => a + b, 0);
+        return values.reduce((sum, v, i) => sum + v * (weights[i] || 0), 0) / total;
+    }
+    normalPdf(x, mu = 0, sigma = 1) {
+        return (1 / (sigma * Math.sqrt(2 * Math.PI))) * Math.exp(-0.5 * Math.pow((x - mu) / sigma, 2));
+    }
+    normalCdf(x, mu = 0, sigma = 1) {
+        const z = (x - mu) / sigma;
+        return 0.5 * (1 + this.erf(z / Math.sqrt(2)));
+    }
+    erf(x) {
+        const a1 = 0.254829592, a2 = -0.284496736, a3 = 1.421413741, a4 = -1.453152027, a5 = 1.061405429;
+        const p = 0.3275911;
+        const t = 1.0 / (1.0 + p * Math.abs(x));
+        const y = 1.0 - ((((a5 * t + a4) * t + a3) * t + a2) * t + a1) * t * Math.exp(-x * x);
+        return x >= 0 ? y : -y;
+    }
+    randInt(a, b) {
+        const lo = Math.min(a, b), hi = Math.max(a, b);
+        return Math.floor(Math.random() * (hi - lo + 1)) + lo;
+    }
 
     // ===== NUMBER THEORY =====
     gcd(a, b) {
@@ -273,6 +332,37 @@ class Calculator {
     modulo(a, b) {
         return a % b;
     }
+    intDiv(a, b) {
+        return Math.trunc(a / b);
+    }
+
+    // ===== FRACTIONS =====
+    frac(num, denom) { return denom !== 0 ? num / denom : NaN; }
+    decimalToFrac(x, maxDenom = 10000) {
+        const sign = x < 0 ? -1 : 1;
+        x = Math.abs(x);
+        let n = 1, d = 1, bestN = 1, bestD = 1, bestErr = Infinity;
+        for (d = 1; d <= maxDenom; d++) {
+            n = Math.round(x * d);
+            const err = Math.abs(x - n / d);
+            if (err < bestErr) { bestErr = err; bestN = n; bestD = d; }
+        }
+        const g = this.gcd(bestN, bestD);
+        bestN /= g; bestD /= g;
+        return (sign * bestN) + '/' + bestD;
+    }
+
+    // ===== BASE CONVERSION & BOOLEAN =====
+    dec2bin(n) { return (n >>> 0).toString(2); }
+    dec2oct(n) { return (n >>> 0).toString(8); }
+    dec2hex(n) { return (n >>> 0).toString(16).toUpperCase(); }
+    bin2dec(s) { return parseInt(String(s).replace(/^0b/, ''), 2); }
+    oct2dec(s) { return parseInt(String(s).replace(/^0o/, ''), 8); }
+    hex2dec(s) { return parseInt(String(s).replace(/^0x/, ''), 16); }
+    boolAnd(a, b) { return (a && b) ? 1 : 0; }
+    boolOr(a, b) { return (a || b) ? 1 : 0; }
+    boolNot(a) { return a ? 0 : 1; }
+    boolXor(a, b) { return (a !== b) ? 1 : 0; }
 
     // ===== ALGEBRA & EQUATIONS =====
     solveQuadratic(a, b, c) {
@@ -310,6 +400,47 @@ class Calculator {
         if (to === 'C') return celsius;
         if (to === 'F') return celsius * 9/5 + 32;
         if (to === 'K') return celsius + 273.15;
+    }
+    massConvert(value, from, to) {
+        const toKg = { kg: 1, g: 0.001, mg: 1e-6, lb: 0.453592, oz: 0.0283495 };
+        return (value * (toKg[from] || 1)) / (toKg[to] || 1);
+    }
+    timeConvert(value, from, to) {
+        const toSec = { s: 1, min: 60, h: 3600, d: 86400, ms: 0.001 };
+        return (value * (toSec[from] || 1)) / (toSec[to] || 1);
+    }
+
+    // ===== LINEAR EQUATIONS =====
+    solveLinear2x2(a1, b1, c1, a2, b2, c2) {
+        const det = a1 * b2 - a2 * b1;
+        if (Math.abs(det) < 1e-10) return null;
+        return { x: (c1 * b2 - c2 * b1) / det, y: (a1 * c2 - a2 * c1) / det };
+    }
+    solveLinear3x3(A, b) {
+        const det = this.matrixDeterminant(A);
+        if (Math.abs(det) < 1e-10) return null;
+        const inv = this.matrixInverse(A);
+        return inv[0].map((_, i) => inv.reduce((sum, row, j) => sum + row[i] * b[j], 0));
+    }
+
+    // ===== VECTORS =====
+    vectorAdd(a, b) { return a.map((v, i) => v + (b[i] || 0)); }
+    vectorSub(a, b) { return a.map((v, i) => v - (b[i] || 0)); }
+    vectorDot(a, b) { return a.reduce((s, v, i) => s + v * (b[i] || 0), 0); }
+    vectorMag(v) { return Math.sqrt(v.reduce((s, x) => s + x * x, 0)); }
+    vectorScale(v, k) { return v.map(x => x * k); }
+    angleBetweenVectors(a, b) {
+        const dot = this.vectorDot(a, b), ma = this.vectorMag(a), mb = this.vectorMag(b);
+        if (ma < 1e-10 || mb < 1e-10) return NaN;
+        return this.fromRadians(Math.acos(Math.max(-1, Math.min(1, dot / (ma * mb)))));
+    }
+    polarToRect(r, theta) {
+        const rad = this.toRadians(theta);
+        return [r * Math.cos(rad), r * Math.sin(rad)];
+    }
+    rectToPolar(x, y) {
+        const r = this.vectorMag([x, y]);
+        return [r, this.fromRadians(Math.atan2(y, x))];
     }
 
     // ===== CALCULUS: NUMERICAL DIFFERENTIATION =====
@@ -518,6 +649,27 @@ class Calculator {
         return A[0].map((_, i) => A.map(row => row[i]));
     }
 
+    matrixInverse(A) {
+        const n = A.length;
+        if (n !== A[0].length) return null;
+        const det = this.matrixDeterminant(A);
+        if (Math.abs(det) < 1e-10) return null;
+        const adj = [];
+        for (let i = 0; i < n; i++) {
+            adj[i] = [];
+            for (let j = 0; j < n; j++) {
+                const minor = A.map((row, ri) => row.filter((_, cj) => cj !== j)).filter((_, ri) => ri !== i);
+                adj[i][j] = ((i + j) % 2 ? -1 : 1) * this.matrixDeterminant(minor);
+            }
+        }
+        const inv = this.matrixTranspose(adj);
+        return inv.map(row => row.map(v => v / det));
+    }
+
+    matrixSubtract(A, B) {
+        return A.map((row, i) => row.map((val, j) => val - B[i][j]));
+    }
+
     // ===== CONSTANTS =====
     getConstant(name) {
         const constants = {
@@ -535,32 +687,63 @@ class Calculator {
         return constants[name] || null;
     }
 
+    // ===== PARENTHESES CHECK =====
+    checkParentheses(expr) {
+        let depth = 0;
+        for (const c of expr) {
+            if (c === '(') depth++;
+            else if (c === ')') { depth--; if (depth < 0) return { ok: false, msg: 'Extra closing parenthesis' }; }
+        }
+        if (depth > 0) return { ok: false, msg: 'Missing closing parenthesis' };
+        return { ok: true };
+    }
+
     // ===== EXPRESSION EVALUATION =====
     evaluateExpression(expr) {
         try {
-            // Replace constants
-            expr = expr.replace(/π|pi/g, String(Math.PI));
-            expr = expr.replace(/e(?![a-zA-Z])/g, String(Math.E));
-            expr = expr.replace(/φ/g, '1.618033988749895');
-            
-            // Replace functions
-            expr = expr.replace(/sin\(/g, '(this.sin(');
-            expr = expr.replace(/cos\(/g, '(this.cos(');
-            expr = expr.replace(/tan\(/g, '(this.tan(');
-            expr = expr.replace(/sqrt\(/g, '(this.sqrt(');
-            expr = expr.replace(/log\(/g, '(this.log10(');
-            expr = expr.replace(/ln\(/g, '(this.ln(');
-            expr = expr.replace(/abs\(/g, '(this.absolute(');
-            expr = expr.replace(/floor\(/g, '(this.floor(');
-            expr = expr.replace(/ceil\(/g, '(this.ceil(');
-            
-            // Fix unmatched parentheses
-            expr += ')'.repeat((expr.match(/\(/g) || []).length - (expr.match(/\)/g) || []).length);
-            
-            const result = Function('"use strict"; return (' + expr + ');').call(this);
+            let e = String(expr).trim();
+            const parenCheck = this.checkParentheses(e);
+            if (!parenCheck.ok) return parenCheck.msg;
+
+            // ANS
+            e = e.replace(/\bANS\b/gi, this.lastAnswer != null ? String(this.lastAnswer) : '0');
+
+            // Variables A-Z (single letter, not part of a word)
+            for (const key of Object.keys(this.variables)) {
+                const re = new RegExp('\\b' + key + '\\b', 'g');
+                e = e.replace(re, String(this.variables[key]));
+            }
+
+            // Percent: 50% -> 0.5
+            e = e.replace(/(\d+(?:\.\d+)?)\s*%/g, (_, n) => String(parseFloat(n) / 100));
+
+            // Constants
+            e = e.replace(/π|pi/g, String(Math.PI));
+            e = e.replace(/\be\b(?!\d)/g, String(Math.E));
+            e = e.replace(/φ/g, '1.618033988749895');
+
+            // Power: ^ -> **
+            e = e.replace(/\^/g, '**');
+            // Factorial: n! -> factorial(n)
+            e = e.replace(/(\d+(?:\.\d+)?)\s*!/g, (_, n) => 'this.factorial(Math.floor(parseFloat("' + n + '")))');
+
+            // Functions (order matters: longer names first)
+            const funcs = [
+                'asin', 'acos', 'atan', 'asec', 'acsc', 'acot', 'asinh', 'acosh', 'atanh',
+                'sinh', 'cosh', 'tanh', 'sin', 'cos', 'tan', 'sec', 'csc', 'cot',
+                'sqrt', 'cbrt', 'log10', 'ln', 'exp', 'pow10', 'abs', 'floor', 'ceil', 'round', 'trunc',
+                'log', 'nthRoot', 'reciprocal', 'factorial', 'permutation', 'combination',
+                'gcd', 'lcm', 'modulo', 'intDiv', 'frac', 'decimalToFrac'
+            ];
+            funcs.forEach(fn => {
+                const re = new RegExp('\\b' + fn + '\\s*\\(', 'g');
+                e = e.replace(re, '(this.' + fn + '(');
+            });
+
+            const result = Function('"use strict"; return (' + e + ');').call(this);
             return this.formatResult(result);
-        } catch (e) {
-            return 'Error';
+        } catch (err) {
+            return err.message && err.message.length < 60 ? err.message : 'Error';
         }
     }
 
@@ -601,6 +784,13 @@ class Calculator {
         
         try {
             const result = this.evaluateExpression(this.expression);
+            if (typeof result === 'string' && (result === 'Error' || result.startsWith('Missing') || result.startsWith('Extra'))) {
+                this.result = result;
+                this.updateDisplay();
+                return;
+            }
+            const num = parseFloat(result);
+            if (!isNaN(num) && isFinite(num)) this.lastAnswer = num;
             this.history.push(`${this.expression} = ${result}`);
             this.expression = '';
             this.result = result;
@@ -624,8 +814,12 @@ class Calculator {
     }
 
     updateDisplay() {
-        document.getElementById('expressionDisplay').textContent = this.expression;
-        document.getElementById('resultDisplay').textContent = this.expression ? this.evaluateExpression(this.expression) : this.result;
+        const exprEl = document.getElementById('expressionDisplay');
+        const resEl = document.getElementById('resultDisplay');
+        const modeEl = document.getElementById('displayModeIndicator');
+        if (exprEl) exprEl.textContent = this.expression || '';
+        if (resEl) resEl.textContent = this.expression ? this.evaluateExpression(this.expression) : this.result;
+        if (modeEl) modeEl.textContent = this.displayMode.toUpperCase() + ' | ' + this.angleMode.substring(0, 3).toUpperCase();
     }
 
     updateHistory() {
@@ -720,7 +914,7 @@ class Calculator {
                     if (label === 'C') this.clear();
                     else if (label === 'DEL') this.backspace();
                     else if (label === '=') this.calculate();
-                    else if (label === 'ANS') this.memoryRecall();
+                    else if (label === 'ANS') { if (this.lastAnswer != null) this.append(String(this.lastAnswer)); this.updateDisplay(); }
                     else if (label === 'π') this.append(String(Math.PI));
                     else if (label === 'e') this.append(String(Math.E));
                     else if (label === 'x²') this.append('^2');
@@ -749,6 +943,8 @@ class Calculator {
                 { label: 'Round', fn: 'round(' },
                 { label: 'RND', fn: 'Math.random()' },
                 { label: 'n!', fn: 'this.factorial(' },
+                { label: 'frac', fn: 'this.frac(' },
+                { label: '→Frac', action: 'showDecimalToFracUI' },
             ],
             trig: [
                 { label: 'sin', fn: 'this.sin(' },
@@ -757,12 +953,18 @@ class Calculator {
                 { label: 'sin⁻¹', fn: 'this.asin(' },
                 { label: 'cos⁻¹', fn: 'this.acos(' },
                 { label: 'tan⁻¹', fn: 'this.atan(' },
-                { label: 'sinh', fn: 'this.sinh(' },
-                { label: 'cosh', fn: 'this.cosh(' },
-                { label: 'tanh', fn: 'this.tanh(' },
                 { label: 'sec', fn: 'this.sec(' },
                 { label: 'csc', fn: 'this.csc(' },
                 { label: 'cot', fn: 'this.cot(' },
+                { label: 'sec⁻¹', fn: 'this.asec(' },
+                { label: 'csc⁻¹', fn: 'this.acsc(' },
+                { label: 'cot⁻¹', fn: 'this.acot(' },
+                { label: 'sinh', fn: 'this.sinh(' },
+                { label: 'cosh', fn: 'this.cosh(' },
+                { label: 'tanh', fn: 'this.tanh(' },
+                { label: 'sinh⁻¹', fn: 'this.asinh(' },
+                { label: 'cosh⁻¹', fn: 'this.acosh(' },
+                { label: 'tanh⁻¹', fn: 'this.atanh(' },
             ],
             log: [
                 { label: 'log₁₀', fn: 'this.log10(' },
@@ -770,46 +972,101 @@ class Calculator {
                 { label: 'eˣ', fn: 'this.exp(' },
                 { label: '10ˣ', fn: 'this.pow10(' },
                 { label: 'logₘ', fn: 'this.log(' },
+                { label: 'ⁿ√', fn: 'this.nthRoot(' },
             ],
             stats: [
                 { label: 'nPr', fn: 'this.permutation(' },
                 { label: 'nCr', fn: 'this.combination(' },
+                { label: 'n!', fn: 'this.factorial(' },
+                { label: 'Mean', action: 'showStatsUI("mean")' },
+                { label: 'Median', action: 'showStatsUI("median")' },
+                { label: 'Mode', action: 'showStatsUI("mode")' },
+                { label: 'σ', action: 'showStatsUI("std")' },
+                { label: 'Variance', action: 'showStatsUI("variance")' },
+                { label: 'Σx²', action: 'showStatsUI("sumSq")' },
+                { label: 'RND', fn: 'Math.random()' },
+                { label: 'RandInt', action: 'showRandIntUI' },
+                { label: 'Normal CDF', action: 'showNormalCDFUI' },
                 { label: 'GCD', fn: 'this.gcd(' },
                 { label: 'LCM', fn: 'this.lcm(' },
                 { label: 'Prime?', fn: 'this.isPrime(' },
+                { label: 'mod', fn: 'this.modulo(' },
+                { label: 'int÷', fn: 'this.intDiv(' },
             ],
             convert: [
                 { label: 'M+', action: 'memoryAdd' },
                 { label: 'M-', action: 'memorySubtract' },
                 { label: 'MC', action: 'memoryClear' },
+                { label: 'MR', action: 'memoryRecall' },
+                { label: 'STO→A', action: 'storeVar("A")' },
+                { label: 'STO→B', action: 'storeVar("B")' },
+                { label: 'STO→C', action: 'storeVar("C")' },
+                { label: 'A', action: 'recallVar("A")' },
+                { label: 'B', action: 'recallVar("B")' },
+                { label: 'C', action: 'recallVar("C")' },
                 { label: '°→Rad', action: 'setAngleMode("radian")' },
                 { label: '°→Grad', action: 'setAngleMode("grad")' },
+                { label: '°→DMS', action: 'showToDMSUI' },
+                { label: 'DMS→°', action: 'showFromDMSUI' },
             ],
             algebra: [
-                { label: 'x²', fn: '', custom: 'x²=0 solver' },
                 { label: '|x|', fn: 'abs(' },
+                { label: 'floor', fn: 'floor(' },
+                { label: 'ceil', fn: 'ceil(' },
+                { label: 'round', fn: 'round(' },
                 { label: 'Quadratic', action: 'showQuadraticSolver' },
+                { label: '2×2 Linear', action: 'showLinear2x2UI' },
+                { label: '3×3 Linear', action: 'showLinear3x3UI' },
             ],
             matrix: [
-                { label: 'Det', info: 'Determinant' },
-                { label: 'Transpose', info: 'Matrix Transpose' },
-                { label: 'Inverse', info: 'Matrix Inverse (2x2)' },
+                { label: 'Det', action: 'showMatrixDetUI' },
+                { label: 'Transpose', action: 'showMatrixTransposeUI' },
+                { label: 'Inverse', action: 'showMatrixInverseUI' },
+                { label: 'A+B', action: 'showMatrixAddUI' },
+                { label: 'A−B', action: 'showMatrixSubUI' },
+                { label: 'A×B', action: 'showMatrixMulUI' },
             ],
             constants: [
                 { label: 'π', fn: String(Math.PI) },
                 { label: 'e', fn: String(Math.E) },
-                { label: 'φ', fn: '1.618' },
-                { label: 'C', fn: '2.998e8' },
+                { label: 'φ', fn: '1.618033988749895' },
+                { label: 'c', fn: '299792458' },
                 { label: 'G', fn: '6.674e-11' },
+                { label: 'h', fn: '6.626e-34' },
+                { label: 'k', fn: '1.381e-23' },
+                { label: 'Nₐ', fn: '6.022e23' },
             ],
             calculus: [
                 { label: 'd/dx', action: 'showDifferentiateUI' },
-                { label: 'Integral', action: 'showIntegrateUI' },
+                { label: '∫ab', action: 'showIntegrateUI' },
                 { label: 'Limit', action: 'showLimitUI' },
                 { label: 'Taylor', action: 'showTaylorUI' },
                 { label: 'Critical Pts', action: 'showCriticalPointsUI' },
-                { label: 'Extrema', action: 'showExtremaUI' },
+                { label: 'Min/Max', action: 'showExtremaUI' },
                 { label: 'Inflection', action: 'showInflectionUI' },
+            ],
+            vectors: [
+                { label: 'Dot', action: 'showVectorDotUI' },
+                { label: '|v|', action: 'showVectorMagUI' },
+                { label: 'Angle', action: 'showVectorAngleUI' },
+                { label: 'Polar→Rect', action: 'showPolarToRectUI' },
+                { label: 'Rect→Polar', action: 'showRectToPolarUI' },
+            ],
+            units: [
+                { label: 'Length', action: 'showUnitConvertUI("length")' },
+                { label: 'Mass', action: 'showUnitConvertUI("mass")' },
+                { label: 'Time', action: 'showUnitConvertUI("time")' },
+                { label: 'Temp', action: 'showUnitConvertUI("temp")' },
+            ],
+            logic: [
+                { label: 'AND', fn: 'this.boolAnd(' },
+                { label: 'OR', fn: 'this.boolOr(' },
+                { label: 'NOT', fn: 'this.boolNot(' },
+                { label: 'XOR', fn: 'this.boolXor(' },
+                { label: 'Dec→Bin', action: 'showBaseConvertUI("dec2bin")' },
+                { label: 'Bin→Dec', action: 'showBaseConvertUI("bin2dec")' },
+                { label: 'Dec→Hex', action: 'showBaseConvertUI("dec2hex")' },
+                { label: 'Hex→Dec', action: 'showBaseConvertUI("hex2dec")' },
             ],
         };
 
@@ -836,7 +1093,31 @@ class Calculator {
                     if (f.action === 'memoryAdd') this.memoryAdd();
                     else if (f.action === 'memorySubtract') this.memorySubtract();
                     else if (f.action === 'memoryClear') this.memoryClear();
+                    else if (f.action === 'memoryRecall') this.memoryRecall();
+                    else if (f.action.startsWith('storeVar')) this.storeVar(f.action.slice(9, -2));
+                    else if (f.action.startsWith('recallVar')) this.recallVar(f.action.slice(10, -2));
+                    else if (f.action.startsWith('showStatsUI')) this.showStatsUI(f.action.slice(12, -2));
+                    else if (f.action === 'showRandIntUI') this.showRandIntUI();
+                    else if (f.action === 'showNormalCDFUI') this.showNormalCDFUI();
                     else if (f.action === 'showQuadraticSolver') this.showQuadraticSolver();
+                    else if (f.action === 'showLinear2x2UI') this.showLinear2x2UI();
+                    else if (f.action === 'showLinear3x3UI') this.showLinear3x3UI();
+                    else if (f.action === 'showMatrixDetUI') this.showMatrixDetUI();
+                    else if (f.action === 'showMatrixTransposeUI') this.showMatrixTransposeUI();
+                    else if (f.action === 'showMatrixInverseUI') this.showMatrixInverseUI();
+                    else if (f.action === 'showMatrixAddUI') this.showMatrixAddUI();
+                    else if (f.action === 'showMatrixSubUI') this.showMatrixSubUI();
+                    else if (f.action === 'showMatrixMulUI') this.showMatrixMulUI();
+                    else if (f.action === 'showPolarToRectUI') this.showPolarToRectUI();
+                    else if (f.action === 'showRectToPolarUI') this.showRectToPolarUI();
+                    else if (f.action === 'showVectorDotUI') this.showVectorDotUI();
+                    else if (f.action === 'showVectorMagUI') this.showVectorMagUI();
+                    else if (f.action === 'showVectorAngleUI') this.showVectorAngleUI();
+                    else if (f.action === 'showToDMSUI') this.showToDMSUI();
+                    else if (f.action === 'showFromDMSUI') this.showFromDMSUI();
+                    else if (f.action === 'showDecimalToFracUI') this.showDecimalToFracUI();
+                    else if (f.action.startsWith('showUnitConvertUI')) this.showUnitConvertUI(f.action.slice(17, -2));
+                    else if (f.action.startsWith('showBaseConvertUI')) this.showBaseConvertUI(f.action.slice(17, -2));
                     else if (f.action === 'showDifferentiateUI') this.showDifferentiateUI();
                     else if (f.action === 'showIntegrateUI') this.showIntegrateUI();
                     else if (f.action === 'showLimitUI') this.showLimitUI();
@@ -967,6 +1248,227 @@ class Calculator {
             this.expression = `x₁ = ${result.x1.toFixed(6)}, x₂ = ${result.x2.toFixed(6)}`;
             this.updateDisplay();
         }
+    }
+
+    storeVar(name) {
+        const val = parseFloat(this.result) || this.lastAnswer;
+        if (val == null || isNaN(val)) { alert('Calculate a result first'); return; }
+        this.variables[name] = val;
+        this.expression = `${name}=${val}`;
+        this.updateDisplay();
+    }
+    recallVar(name) {
+        if (this.variables[name] != null) this.append(String(this.variables[name]));
+        else this.append('0');
+        this.updateDisplay();
+    }
+    showStatsUI(op) {
+        const raw = prompt('Enter numbers separated by commas:');
+        if (!raw) return;
+        const arr = raw.split(/[\s,]+/).map(Number).filter(n => !isNaN(n));
+        if (arr.length === 0) { alert('Invalid numbers'); return; }
+        let r;
+        if (op === 'mean') r = this.mean(arr);
+        else if (op === 'median') r = this.median(arr);
+        else if (op === 'mode') r = this.mode(arr);
+        else if (op === 'std') r = this.stdDev(arr);
+        else if (op === 'variance') r = this.variance(arr);
+        else if (op === 'sumSq') r = this.sumSquares(arr);
+        this.expression = op + '(' + arr.join(',') + ') = ' + (Array.isArray(r) ? r.join(', ') : this.formatResult(r));
+        this.updateDisplay();
+    }
+    showRandIntUI() {
+        const a = parseInt(prompt('Min (integer):'), 10);
+        const b = parseInt(prompt('Max (integer):'), 10);
+        if (isNaN(a) || isNaN(b)) return;
+        const r = this.randInt(a, b);
+        this.expression = 'RandInt(' + a + ',' + b + ') = ' + r;
+        this.updateDisplay();
+    }
+    showNormalCDFUI() {
+        const x = parseFloat(prompt('x value:'));
+        const mu = parseFloat(prompt('Mean μ (default 0):', '0')) || 0;
+        const sigma = parseFloat(prompt('Std σ (default 1):', '1')) || 1;
+        if (isNaN(x)) return;
+        const r = this.normalCdf(x, mu, sigma);
+        this.expression = 'Φ(' + x + ') ≈ ' + r.toFixed(6);
+        this.updateDisplay();
+    }
+    showLinear2x2UI() {
+        const s = prompt('Enter a1 b1 c1 a2 b2 c2 (space-separated):\nEq1: a1*x+b1*y=c1, Eq2: a2*x+b2*y=c2');
+        if (!s) return;
+        const n = s.trim().split(/\s+/).map(Number);
+        if (n.length < 6) { alert('Need 6 numbers'); return; }
+        const r = this.solveLinear2x2(n[0], n[1], n[2], n[3], n[4], n[5]);
+        if (!r) this.expression = 'No unique solution';
+        else this.expression = 'x = ' + r.x.toFixed(6) + ', y = ' + r.y.toFixed(6);
+        this.updateDisplay();
+    }
+    showLinear3x3UI() {
+        alert('Enter 3×3 matrix A (9 numbers, row by row) and 3 values b (space-separated). Example: 1 0 0 0 1 0 0 0 1 5 6 7');
+        const s = prompt('A row1 row2 row3 then b1 b2 b3:');
+        if (!s) return;
+        const n = s.trim().split(/\s+/).map(Number);
+        if (n.length < 12) { alert('Need 12 numbers'); return; }
+        const A = [n.slice(0, 3), n.slice(3, 6), n.slice(6, 9)];
+        const b = n.slice(9, 12);
+        const r = this.solveLinear3x3(A, b);
+        if (!r) this.expression = 'No unique solution';
+        else this.expression = 'x = ' + r.map(v => v.toFixed(6)).join(', ');
+        this.updateDisplay();
+    }
+    parseMatrix2D(str) {
+        const rows = str.trim().split(/[;\n]+/);
+        return rows.map(row => row.split(/[\s,]+/).map(Number));
+    }
+    showMatrixDetUI() {
+        const s = prompt('Enter matrix (rows separated by ; or newline)\nExample: 1 2 ; 3 4');
+        if (!s) return;
+        const A = this.parseMatrix2D(s);
+        const r = this.matrixDeterminant(A);
+        this.expression = 'det = ' + this.formatResult(r);
+        this.updateDisplay();
+    }
+    showMatrixTransposeUI() {
+        const s = prompt('Enter matrix (rows ; separated)\nExample: 1 2 ; 3 4');
+        if (!s) return;
+        const A = this.parseMatrix2D(s);
+        const T = this.matrixTranspose(A);
+        this.expression = 'Transpose = ' + JSON.stringify(T);
+        this.updateDisplay();
+    }
+    showMatrixInverseUI() {
+        const s = prompt('Enter square matrix (rows ; separated)');
+        if (!s) return;
+        const A = this.parseMatrix2D(s);
+        const inv = this.matrixInverse(A);
+        if (!inv) this.expression = 'No inverse';
+        else this.expression = 'Inverse = ' + JSON.stringify(inv);
+        this.updateDisplay();
+    }
+    showMatrixAddUI() {
+        const s = prompt('Matrix A (rows ; sep):');
+        if (!s) return;
+        const A = this.parseMatrix2D(s);
+        const t = prompt('Matrix B (same size):');
+        if (!t) return;
+        const B = this.parseMatrix2D(t);
+        const r = this.matrixAdd(A, B);
+        this.expression = 'A+B = ' + JSON.stringify(r);
+        this.updateDisplay();
+    }
+    showMatrixSubUI() {
+        const s = prompt('Matrix A:');
+        if (!s) return;
+        const A = this.parseMatrix2D(s);
+        const t = prompt('Matrix B:');
+        if (!t) return;
+        const B = this.parseMatrix2D(t);
+        const r = this.matrixSubtract(A, B);
+        this.expression = 'A−B = ' + JSON.stringify(r);
+        this.updateDisplay();
+    }
+    showMatrixMulUI() {
+        const s = prompt('Matrix A:');
+        if (!s) return;
+        const A = this.parseMatrix2D(s);
+        const t = prompt('Matrix B (cols A = rows B):');
+        if (!t) return;
+        const B = this.parseMatrix2D(t);
+        const r = this.matrixMultiply(A, B);
+        this.expression = 'A×B = ' + JSON.stringify(r);
+        this.updateDisplay();
+    }
+    parseVector(str) {
+        return str.trim().split(/[\s,]+/).map(Number).filter(n => !isNaN(n));
+    }
+    showVectorDotUI() {
+        const a = this.parseVector(prompt('Vector A (e.g. 1 2 or 1,2,3):'));
+        const b = this.parseVector(prompt('Vector B:'));
+        if (a.length === 0 || b.length === 0) return;
+        const r = this.vectorDot(a, b);
+        this.expression = 'A·B = ' + this.formatResult(r);
+        this.updateDisplay();
+    }
+    showVectorMagUI() {
+        const v = this.parseVector(prompt('Vector (e.g. 3 4):'));
+        if (v.length === 0) return;
+        const r = this.vectorMag(v);
+        this.expression = '|v| = ' + this.formatResult(r);
+        this.updateDisplay();
+    }
+    showVectorAngleUI() {
+        const a = this.parseVector(prompt('Vector A:'));
+        const b = this.parseVector(prompt('Vector B:'));
+        if (a.length === 0 || b.length === 0) return;
+        const r = this.angleBetweenVectors(a, b);
+        this.expression = 'angle = ' + this.formatResult(r) + '°';
+        this.updateDisplay();
+    }
+    showPolarToRectUI() {
+        const r = parseFloat(prompt('r:'));
+        const th = parseFloat(prompt('θ (degrees):'));
+        if (isNaN(r) || isNaN(th)) return;
+        const [x, y] = this.polarToRect(r, th);
+        this.expression = 'x = ' + x.toFixed(6) + ', y = ' + y.toFixed(6);
+        this.updateDisplay();
+    }
+    showRectToPolarUI() {
+        const x = parseFloat(prompt('x:'));
+        const y = parseFloat(prompt('y:'));
+        if (isNaN(x) || isNaN(y)) return;
+        const [r, theta] = this.rectToPolar(x, y);
+        this.expression = 'r = ' + r.toFixed(6) + ', θ = ' + theta.toFixed(6) + '°';
+        this.updateDisplay();
+    }
+    showDecimalToFracUI() {
+        const val = parseFloat(this.result) || this.lastAnswer;
+        if (val == null || isNaN(val)) { alert('Enter or calculate a decimal first'); return; }
+        const r = this.decimalToFrac(val);
+        this.expression = val + ' = ' + r;
+        this.updateDisplay();
+    }
+    showToDMSUI() {
+        const deg = parseFloat(prompt('Degrees (decimal):'));
+        if (isNaN(deg)) return;
+        const { d, m, s } = this.toDMS(deg);
+        this.expression = deg + '° = ' + d + '° ' + m + "' " + s.toFixed(2) + '"';
+        this.updateDisplay();
+    }
+    showFromDMSUI() {
+        const d = parseFloat(prompt('Degrees (int):'));
+        const m = parseFloat(prompt('Minutes:'));
+        const s = parseFloat(prompt('Seconds:'));
+        if (isNaN(d)) return;
+        const r = this.fromDMS(d, m || 0, s || 0);
+        this.expression = d + '° ' + (m || 0) + "' " + (s || 0) + '" = ' + r.toFixed(6) + '°';
+        this.updateDisplay();
+    }
+    showUnitConvertUI(kind) {
+        const val = parseFloat(prompt('Value:'));
+        if (isNaN(val)) return;
+        const from = prompt('From unit (e.g. m, km, ft):').toLowerCase();
+        const to = prompt('To unit:').toLowerCase();
+        let r;
+        if (kind === 'length') r = this.lengthConvert(val, from, to);
+        else if (kind === 'mass') r = this.massConvert(val, from, to);
+        else if (kind === 'time') r = this.timeConvert(val, from, to);
+        else if (kind === 'temp') r = this.tempConvert(val, from.toUpperCase(), to.toUpperCase());
+        else return;
+        this.expression = val + ' ' + from + ' = ' + this.formatResult(r) + ' ' + to;
+        this.updateDisplay();
+    }
+    showBaseConvertUI(kind) {
+        const s = prompt('Enter number or string:');
+        if (s === null) return;
+        let r;
+        if (kind === 'dec2bin') r = this.dec2bin(parseInt(s, 10));
+        else if (kind === 'bin2dec') r = this.bin2dec(s);
+        else if (kind === 'dec2hex') r = this.dec2hex(parseInt(s, 10));
+        else if (kind === 'hex2dec') r = this.hex2dec(s);
+        else return;
+        this.expression = kind + '(' + s + ') = ' + r;
+        this.updateDisplay();
     }
 }
 
