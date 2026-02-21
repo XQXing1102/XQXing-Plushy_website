@@ -1,6 +1,23 @@
 const TODO_API = "http://127.0.0.1:9999/todos";
 const FOLDERS_API = "http://127.0.0.1:9999/folders";
 
+// ===== TOAST NOTIFICATIONS =====
+function showToast(type, message) {
+  const container = document.getElementById("toastContainer");
+  if (!container) return;
+  const toast = document.createElement("div");
+  toast.className = "toast " + (type === "error" ? "error" : type === "info" ? "info" : "success");
+  const icon = type === "error" ? "⚠️" : type === "info" ? "ℹ️" : "✓";
+  toast.innerHTML = `<span>${icon}</span><span>${message}</span>`;
+  container.appendChild(toast);
+  const duration = 3500;
+  const t = setTimeout(() => {
+    toast.classList.add("toast-out");
+    setTimeout(() => toast.remove(), 300);
+  }, duration);
+  toast._clear = () => { clearTimeout(t); toast.remove(); };
+}
+
 // ===== GLOBAL STATE FOR FOLDERS =====
 let currentFolderId = null; // Track which folder is currently selected
 let timeFormat = localStorage.getItem("timeFormat") || "24h"; // 24h or 12h
@@ -171,13 +188,15 @@ async function addTask() {
       document.getElementById("title").value = "";
       document.getElementById("dueTime").value = "";
       fetchTodos(currentFolderId);
+      showToast("success", "Task added");
     } else {
       const errorData = await res.json();
       console.error("API Error:", errorData);
-      alert("Failed to add task");
+      showToast("error", "Failed to add task");
     }
   } catch (error) {
     console.error("Error adding task:", error);
+    showToast("error", "Failed to add task");
   }
 }
 
@@ -190,11 +209,13 @@ async function deleteTask(id) {
 
     if (res.ok) {
       fetchTodos(currentFolderId);
+      showToast("success", "Task deleted");
     } else {
-      alert("Failed to delete task");
+      showToast("error", "Failed to delete task");
     }
   } catch (error) {
     console.error("Error deleting task:", error);
+    showToast("error", "Failed to delete task");
   }
 }
 
@@ -210,11 +231,13 @@ async function completeTask(id, completed) {
 
     if (res.ok) {
       fetchTodos(currentFolderId);
+      showToast("success", "Task updated");
     } else {
-      alert("Failed to update task");
+      showToast("error", "Failed to update task");
     }
   } catch (error) {
     console.error("Error updating task:", error);
+    showToast("error", "Failed to update task");
   }
 }
 
@@ -283,13 +306,13 @@ async function saveEditTask() {
     if (res.ok) {
       cancelEdit();
       fetchTodos(currentFolderId);
+      showToast("success", "Task updated");
     } else {
-      // If failed, show error alert
-      alert("Failed to update task");
+      showToast("error", "Failed to update task");
     }
   } catch (error) {
     console.error("Error updating task:", error);
-    alert("Error updating task");
+    showToast("error", "Error updating task");
   }
 }
 
