@@ -1,4 +1,8 @@
 const TODO_API = "http://127.0.0.1:9999/todos";
+const FOLDERS_API = "http://127.0.0.1:9999/folders";
+
+// ===== GLOBAL STATE FOR FOLDERS =====
+let currentFolderId = null; // Track which folder is currently selected
 
 function getAuthHeaders() {
   const token = getToken();
@@ -8,9 +12,10 @@ function getAuthHeaders() {
   };
 }
 
-async function fetchTodos() {
+async function fetchTodos(folderId = null) {
   try {
-    const res = await fetch(TODO_API, {
+    const url = folderId ? TODO_API + "?folder_id=" + folderId : TODO_API;
+    const res = await fetch(url, {
       headers: getAuthHeaders(),
     });
 
@@ -87,7 +92,16 @@ async function addTask() {
   console.log("addTask called");
   const title = document.getElementById("title").value;
   const priority = document.getElementById("priority").value;
-  const dueDate = document.getElementById("dueDate").value;
+  let dueDate = document.getElementById("dueDate").value;
+
+  // If no date provided, default to today's local date
+  if (!dueDate) {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    dueDate = `${year}-${month}-${day}`;
+  }
 
   console.log("Task data:", { title, priority, dueDate });
 
@@ -98,14 +112,19 @@ async function addTask() {
     const res = await fetch(TODO_API, {
       method: "POST",
       headers: getAuthHeaders(),
-      body: JSON.stringify({ title, priority, due_date: dueDate }),
+      body: JSON.stringify({ 
+        title, 
+        priority, 
+        due_date: dueDate,
+        folder_id: currentFolderId
+      }),
     });
 
     console.log("Response status:", res.status);
 
     if (res.ok) {
       document.getElementById("title").value = "";
-      fetchTodos();
+      fetchTodos(currentFolderId);
     } else {
       const errorData = await res.json();
       console.error("API Error:", errorData);
@@ -124,7 +143,7 @@ async function deleteTask(id) {
     });
 
     if (res.ok) {
-      fetchTodos();
+      fetchTodos(currentFolderId);
     } else {
       alert("Failed to delete task");
     }
@@ -144,7 +163,7 @@ async function completeTask(id, completed) {
     });
 
     if (res.ok) {
-      fetchTodos();
+      fetchTodos(currentFolderId);
     } else {
       alert("Failed to update task");
     }
@@ -212,7 +231,7 @@ async function saveEditTask() {
     // If successful, close modal and refresh todos
     if (res.ok) {
       cancelEdit();
-      fetchTodos();
+      fetchTodos(currentFolderId);
     } else {
       // If failed, show error alert
       alert("Failed to update task");
@@ -241,6 +260,185 @@ function dateToInput(dateString) {
   return dateString;
 }
 
+// ================================
+// ===== FOLDER MANAGEMENT =====
+// ================================
+
+// STEP 1: Fetch all folders from backend
+async function fetchFolders() {
+  try {
+    const res = await fetch(FOLDERS_API, { 
+      headers: getAuthHeaders() 
+    });
+
+    if (!res.ok) {
+      console.error("Failed to fetch folders");
+      return;
+    }
+
+    const folders = await res.json();
+    const folderList = document.getElementById("folderList");
+    
+    if (!folderList) {
+      console.error("folderList element not found");
+      return;
+    }
+    
+    folderList.innerHTML = "";
+
+    if (folders.length === 0) {
+      folderList.innerHTML = '<div class="empty-folder-message">No folders yet. Create one!</div>';
+      return;
+    }
+
+    folders.forEach((folder) => {
+      const folderItem = document.createElement("div");
+      folderItem.className = "folder-item";
+      folderItem.setAttribute("data-folder-id", folder.id);
+      
+      folderItem.innerHTML = `
+        <div class="folder-name" onclick="selectFolder(${folder.id})">
+          📁 ${folder.name}
+        </div>
+        <div class="folder-actions">
+          <button class="folder-btn rename-btn" onclick="renameFolder(${folder.id})" title="Rename">✏️</button>
+          <button class="folder-btn delete-btn" onclick="deleteFolder(${folder.id})" title="Delete">🗑</button>
+        </div>
+      `;
+      
+      folderList.appendChild(folderItem);
+    });
+
+    // Auto-select the first folder if none is selected
+    if (!currentFolderId && folders.length > 0) {
+      selectFolder(folders[0].id);
+    }
+
+  } catch (error) {
+    console.error("Error fetching folders:", error);
+  }
+}
+
+// STEP 2: Create a new folder
+async function createFolder() {
+  const folderInput = document.getElementById("folderInput");
+  const folderName = folderInput.value.trim();
+
+  if (!folderName) {
+    alert("Enter folder name");
+    return;
+  }
+
+  try {
+    const res = await fetch(FOLDERS_API, {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ name: folderName }),
+    });
+
+    if (res.ok) {
+      folderInput.value = "";
+      fetchFolders();
+      // Auto-select the newly created folder
+      const folders = await fetch(FOLDERS_API, { headers: getAuthHeaders() }).then(r => r.json());
+      if (folders.length > 0) {
+        selectFolder(folders[folders.length - 1].id);
+      }
+    } else {
+      alert("Failed to create folder");
+    }
+  } catch (error) {
+    console.error("Error creating folder:", error);
+  }
+}
+
+// STEP 3: Delete a folder
+async function deleteFolder(folderId) {
+  if (!confirm("Delete this folder and all its todos?")) return;
+
+  try {
+    const res = await fetch(FOLDERS_API + "/" + folderId, {
+      method: "DELETE",
+      headers: getAuthHeaders(),
+    });
+
+    if (res.ok) {
+      if (currentFolderId === folderId) {
+        currentFolderId = null;
+      }
+      fetchFolders();
+      fetchTodos();
+    } else {
+      alert("Failed to delete folder");
+    }
+  } catch (error) {
+    console.error("Error deleting folder:", error);
+  }
+}
+
+// STEP 4: Rename/Update folder
+async function renameFolder(folderId) {
+  const newName = prompt("Enter new folder name:");
+  if (!newName) return;
+
+  try {
+    const res = await fetch(FOLDERS_API + "/" + folderId, {
+      method: "PUT",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ name: newName }),
+    });
+
+    if (res.ok) {
+      fetchFolders();
+    } else {
+      alert("Failed to rename folder");
+    }
+  } catch (error) {
+    console.error("Error renaming folder:", error);
+  }
+}
+
+// STEP 5: Select a folder and display its todos
+async function selectFolder(folderId) {
+  currentFolderId = folderId;
+
+  // Update UI to highlight the selected folder
+  document.querySelectorAll(".folder-item").forEach(item => {
+    item.classList.remove("active");
+  });
+  if (folderId) {
+    document.querySelector(`[data-folder-id="${folderId}"]`).classList.add("active");
+  }
+
+  // Fetch and display todos for this folder
+  fetchTodos(folderId);
+}
+
+// STEP 6: Modify fetchTodos to accept folderId parameter
+// Update existing fetchTodos function:
+// async function fetchTodos(folderId = null) {
+//   const url = folderId ? TODO_API + "?folder_id=" + folderId : TODO_API;
+//   // Rest of fetchTodos logic...
+//   // This filters todos to only show those in the selected folder
+// }
+
+// STEP 7: Modify addTask to include folder_id
+// Update existing addTask function:
+// const folderIdToAdd = currentFolderId || null;
+// body: JSON.stringify({ 
+//   title, 
+//   priority, 
+//   due_date: dueDate,
+//   folder_id: folderIdToAdd  // Add this line
+// }),
+
+// STEP 8: HTML Changes Needed
+// In todo.html, add:
+// - Sidebar/folder navigation panel (before or beside todo-card)
+// - Folder list display area (id="folderList")
+// - Folder creation input (id="folderInput") and button
+// - Update fetchTodos() call on page load to load default folder
+
 function checkNotification(todo) {
   if (!todo.due_date) return;
 
@@ -267,7 +465,15 @@ document.addEventListener("DOMContentLoaded", () => {
   } else {
     console.error("addTaskButton not found!");
   }
-  fetchTodos();
+  
+  // Initialize folders on page load
+  fetchFolders();
+  
+  // Attach event listener for folder creation button
+  const createFolderBtn = document.getElementById("createFolderBtn");
+  if (createFolderBtn) {
+    createFolderBtn.addEventListener("click", createFolder);
+  }
 });
 
 (function () {

@@ -233,6 +233,28 @@ button:hover::after{
     gap:10px;
     text-align:center;
   }
+
+  /* Mobile folder styles */
+  .folder-sidebar {
+    margin-bottom: 16px;
+    max-height: 200px;
+  }
+
+  .folder-list {
+    max-height: 300px;
+  }
+
+  .folder-item {
+    font-size: 13px;
+  }
+
+  .folder-name {
+    font-size: 13px;
+  }
+
+  .folder-actions {
+    opacity: 1; /* Always show on mobile */
+  }
 }
 
 /* ===== EDIT MODAL STYLES ===== */
@@ -363,6 +385,179 @@ button:hover::after{
   background: rgba(255, 152, 0, 0.5);
 }
 
+/* ===== FOLDER STYLES ===== */
+.folder-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 24px;
+  padding: 16px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(25px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.folder-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.folder-header h3 {
+  margin: 0;
+  color: white;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.folder-input-group {
+  display: flex;
+  gap: 8px;
+}
+
+.folder-input {
+  flex: 1;
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 12px;
+  border: none;
+  outline: none;
+  color: white;
+  font-size: 13px;
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(20px);
+  transition: 0.3s;
+}
+
+.folder-input::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.folder-input:focus {
+  background: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
+}
+
+.create-folder-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  border: none;
+  cursor: pointer;
+  background: rgba(76, 175, 80, 0.3);
+  backdrop-filter: blur(20px);
+  color: white;
+  font-weight: 700;
+  font-size: 18px;
+  transition: 0.3s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.create-folder-btn:hover {
+  background: rgba(76, 175, 80, 0.5);
+  transform: translateY(-2px);
+}
+
+.create-folder-btn:active {
+  transform: scale(0.95);
+}
+
+.folder-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.folder-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+  transition: 0.3s;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.folder-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.folder-item.active {
+  background: rgba(100, 200, 255, 0.3);
+  border-color: rgba(100, 200, 255, 0.5);
+  color: white;
+  font-weight: 500;
+}
+
+.folder-name {
+  flex: 1;
+  font-size: 14px;
+  user-select: none;
+}
+
+.folder-actions {
+  display: flex;
+  gap: 6px;
+  opacity: 0;
+  transition: 0.2s;
+}
+
+.folder-item:hover .folder-actions {
+  opacity: 1;
+}
+
+.folder-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  font-size: 12px;
+  transition: 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.folder-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.folder-btn.delete-btn:hover {
+  background: rgba(255, 76, 76, 0.4);
+}
+
+.folder-btn.rename-btn:hover {
+  background: rgba(255, 152, 0, 0.4);
+}
+
+.empty-folder-message {
+  text-align: center;
+  padding: 20px;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 13px;
+  font-style: italic;
+}
+
+.loading-message {
+  text-align: center;
+  padding: 20px;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 13px;
+}
+
 </style>
 
 </head>
@@ -371,6 +566,29 @@ button:hover::after{
 
 <div class="auth-container">
 <div class="page-wrap">
+
+  <!-- ===== FOLDER SIDEBAR ===== -->
+  <div class="folder-sidebar">
+    <div class="folder-header">
+      <h3>📁 Folders</h3>
+    </div>
+
+    <div class="folder-input-group">
+      <input 
+        type="text" 
+        id="folderInput" 
+        class="folder-input" 
+        placeholder="New folder..."
+      >
+      <button id="createFolderBtn" class="create-folder-btn">
+        <span>+</span>
+      </button>
+    </div>
+
+    <div id="folderList" class="folder-list">
+      <div class="loading-message">Loading folders...</div>
+    </div>
+  </div>
 
   <div class="todo-header">
     <h1>📝 Smart Todo Manager</h1>
