@@ -45,6 +45,7 @@ async function fetchTodos() {
               <div>
                 <button class="completeBtn" data-id="${todo.id}" data-completed="${todo.completed}">✔</button>
                 <button class="deleteBtn" data-id="${todo.id}">🗑</button>
+                <!-- ADD EDIT BUTTON HERE: <button class="editBtn" data-id="${todo.id}">✏️</button> -->
               </div>
           `;
 
@@ -143,6 +144,58 @@ async function completeTask(id, completed) {
     console.error("Error updating task:", error);
   }
 }
+
+// ===== EDIT TASK FUNCTION =====
+// STEP 1: Create editTask function to open modal with current task data
+async function editTask(id) {
+  // TODO: Fetch the specific task data from the todos list (from the DOM or API)
+  // TODO: Show the edit modal
+  // TODO: Populate the modal form with current task data (title, priority, due_date)
+  // TODO: Set a data attribute on the modal to track which task ID is being edited
+}
+
+// STEP 2: Create saveEditTask function to update task via API
+async function saveEditTask(id) {
+  // TODO: Get the updated values from the form inputs
+  // const updatedTitle = document.getElementById("editTitle").value;
+  // const updatedPriority = document.getElementById("editPriority").value;
+  // const updatedDueDate = document.getElementById("editDueDate").value;
+
+  // TODO: Validate that title is not empty
+  
+  // TODO: Send PUT request to TODO_API + "/" + id with the updated data
+  // const res = await fetch(TODO_API + "/" + id, {
+  //   method: "PUT",
+  //   headers: getAuthHeaders(),
+  //   body: JSON.stringify({
+  //     title: updatedTitle,
+  //     priority: updatedPriority,
+  //     due_date: updatedDueDate
+  //   }),
+  // });
+
+  // TODO: If successful, close modal and refresh todos
+  // TODO: If failed, show error alert
+}
+
+// STEP 3: Create cancelEdit function to close modal without saving
+function cancelEdit() {
+  // TODO: Hide the edit modal
+  // TODO: Clear the form inputs
+}
+
+// STEP 4: Add edit button to the HTML in fetchTodos()
+// In the fetchTodos() function, add this button next to completeBtn and deleteBtn:
+// <button class="editBtn" data-id="${todo.id}">✏️</button>
+
+// STEP 5: Add event listener for edit button in fetchTodos()
+// After the deleteBtn event listeners, add:
+// document.querySelectorAll(".editBtn").forEach((btn) => {
+//   btn.addEventListener("click", function () {
+//     const id = this.getAttribute("data-id");
+//     editTask(id);
+//   });
+// });
 
 function checkNotification(todo) {
   if (!todo.due_date) return;

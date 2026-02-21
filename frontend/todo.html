@@ -234,6 +234,15 @@ button:hover::after{
   }
 }
 
+/* ===== EDIT MODAL STYLES ===== */
+/* TODO: Add styles for:
+   - .edit-modal { display: none; position: fixed; ... } (hidden by default)
+   - .edit-modal.active { display: flex; } (shown when editing)
+   - .modal-overlay { background: rgba(0,0,0,.7); } (dark background)
+   - .modal-content { background: glass effect; padding; border-radius; }
+   - .editBtn { width: 38px; height: 38px; } (match complete/delete button size)
+*/
+
 </style>
 
 </head>
@@ -272,6 +281,18 @@ button:hover::after{
     </div>
 
     <ul id="todoList"></ul>
+
+    <!-- ===== EDIT MODAL ===== -->
+    <!-- TODO: Create an edit modal here with:
+         - Hidden by default (display: none or hidden class)
+         - Modal overlay (dark background)
+         - Edit form with:
+           * Input for title (id="editTitle")
+           * Select for priority (id="editPriority")
+           * Input for due date (id="editDueDate")
+           * Save button (onclick="saveEditTask(currentEditId)")
+           * Cancel button (onclick="cancelEdit()")
+    -->
 
   </div>
 
