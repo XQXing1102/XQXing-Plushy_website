@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scientific Calculator Pro</title>
+    <script src="https://www.desmos.com/api/v1.8/calculator.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #fff;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        /* ===== CALCULATOR PANEL ===== */
+        .calc-panel {
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 24px;
+            padding: 24px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .calc-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .calc-header h1 {
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .mode-buttons {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .mode-btn {
+            padding: 6px 12px;
+            font-size: 11px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #fff;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .mode-btn.active {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.5);
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
+        }
+
+        /* Display Area */
+        .display-area {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 20px;
+            min-height: 100px;
+        }
+
+        .expression-display {
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.7);
+            min-height: 24px;
+            margin-bottom: 8px;
+            text-align: right;
+            word-break: break-all;
+            font-family: 'Courier New', monospace;
+        }
+
+        .result-display {
+            font-size: 32px;
+            font-weight: 600;
+            text-align: right;
+            min-height: 48px;
+            display: flex;
+            align-items: flex-end;
+            justify-content: flex-end;
+            color: #fff;
+            font-family: 'Courier New', monospace;
+        }
+
+        /* Calculator Grid */
+        .calc-grid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+
+        .calc-btn {
+            padding: 14px 8px;
+            border: none;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .calc-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+        }
+
+        .calc-btn.operator {
+            background: rgba(255, 107, 107, 0.3);
+            border-color: rgba(255, 107, 107, 0.5);
+        }
+
+        .calc-btn.operator:hover {
+            background: rgba(255, 107, 107, 0.5);
+        }
+
+        .calc-btn.equals {
+            background: rgba(107, 255, 107, 0.3);
+            border-color: rgba(107, 255, 107, 0.5);
+            grid-column: span 2;
+        }
+
+        .calc-btn.equals:hover {
+            background: rgba(107, 255, 107, 0.5);
+        }
+
+        .calc-btn.clear {
+            background: rgba(255, 200, 107, 0.3);
+            grid-column: span 2;
+        }
+
+        .calc-btn.clear:hover {
+            background: rgba(255, 200, 107, 0.5);
+        }
+
+        /* Functions Tabs */
+        .function-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+            padding-bottom: 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .function-tab {
+            padding: 8px 14px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: #fff;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.3s;
+        }
+
+        .function-tab.active {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: rgba(255, 255, 255, 0.4);
+        }
+
+        .function-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .function-btn {
+            padding: 12px 8px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.08);
+            color: #fff;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+
+        .function-btn:hover {
+            background: rgba(255, 255, 255, 0.15);
+            transform: translateY(-2px);
+        }
+
+        /* History Panel */
+        .history-panel {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 16px;
+            max-height: 250px;
+            overflow-y: auto;
+            margin-top: 16px;
+        }
+
+        .history-title {
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .history-item {
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            font-size: 12px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: 'Courier New', monospace;
+        }
+
+        .history-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        /* ===== GRAPH PANEL ===== */
+        .graph-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .graph-card {
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 24px;
+            padding: 24px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .graph-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .graph-header h2 {
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        #calculator {
+            width: 100%;
+            height: 500px;
+            border-radius: 16px;
+            overflow: hidden;
+            background: #1a1a2e;
+        }
+
+        .graph-input-group {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .graph-input {
+            flex: 1;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 10px;
+            color: #fff;
+            font-size: 13px;
+        }
+
+        .graph-input::placeholder {
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .graph-btn {
+            padding: 12px 16px;
+            background: rgba(107, 200, 255, 0.3);
+            border: 1px solid rgba(107, 200, 255, 0.5);
+            color: #fff;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+
+        .graph-btn:hover {
+            background: rgba(107, 200, 255, 0.5);
+        }
+
+        /* Folders & Graphs Management */
+        .graph-management {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 16px;
+        }
+
+        .folder-item {
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 13px;
+        }
+
+        .folder-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .folder-actions {
+            display: flex;
+            gap: 6px;
+        }
+
+        .folder-btn {
+            padding: 4px 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #fff;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 11px;
+            transition: all 0.2s;
+        }
+
+        .folder-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        /* Memory Display */
+        .memory-section {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 12px;
+            margin-bottom: 16px;
+            font-size: 12px;
+        }
+
+        .memory-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        /* Responsive Design */
+        @media (max-width: 1024px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+
+            .calc-grid {
+                grid-template-columns: repeat(5, 1fr);
+            }
+
+            #calculator {
+                height: 400px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .calc-grid {
+                grid-template-columns: repeat(4, 1fr);
+            }
+
+            .function-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+
+            #calculator {
+                height: 300px;
+            }
+        }
+
+        /* Scrollbar styling */
+        .history-panel::-webkit-scrollbar,
+        .graph-management::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .history-panel::-webkit-scrollbar-track,
+        .graph-management::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+        }
+
+        .history-panel::-webkit-scrollbar-thumb,
+        .graph-management::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+        }
+
+        .history-panel::-webkit-scrollbar-thumb:hover,
+        .graph-management::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .tabs-container {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- LEFT PANEL: CALCULATOR -->
+        <div class="calc-panel">
+            <div class="calc-header">
+                <h1>🧮 Calc Pro</h1>
+            <div class="mode-buttons">
+                    <button class="mode-btn active" id="degreeMode" data-mode="degree">DEG</button>
+                    <button class="mode-btn" id="radianMode" data-mode="radian">RAD</button>
+                    <button class="mode-btn" id="gradMode" data-mode="grad">GRAD</button>
+                    <button class="mode-btn active" id="fixMode" data-display="fix">FIX</button>
+                    <button class="mode-btn" id="sciMode" data-display="sci">SCI</button>
+                    <button class="mode-btn" id="engMode" data-display="eng">ENG</button>
+                    <a href="index.html" style="padding: 6px 12px; font-size: 11px; background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); color: #fff; border-radius: 8px; text-decoration: none; display: flex; align-items: center; cursor: pointer;">Dashboard</a>
+                    <a href="todo.html" style="padding: 6px 12px; font-size: 11px; background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); color: #fff; border-radius: 8px; text-decoration: none; display: flex; align-items: center; cursor: pointer;">Todo</a>
+                </div>
+            </div>
+
+            <!-- Display -->
+            <div class="display-area">
+                <div class="expression-display" id="expressionDisplay"></div>
+                <div class="result-display" id="resultDisplay">0</div>
+            </div>
+
+            <!-- Memory Display -->
+            <div class="memory-section" id="memorySection" style="display: none;">
+                <div class="memory-item">
+                    <span>Memory:</span>
+                    <span id="memoryValue">0</span>
+                </div>
+            </div>
+
+            <!-- Basic Calculator Grid -->
+            <div class="calc-grid" id="calcGrid">
+                <!-- Dynamically populated -->
+            </div>
+
+            <!-- Function Tabs -->
+            <div class="tabs-container">
+                <div class="function-tabs" id="functionTabs">
+                    <button class="function-tab active" data-tab="basic">Basic</button>
+                    <button class="function-tab" data-tab="trig">Trig</button>
+                    <button class="function-tab" data-tab="log">Log/Exp</button>
+                    <button class="function-tab" data-tab="stats">Stats</button>
+                    <button class="function-tab" data-tab="convert">Convert</button>
+                    <button class="function-tab" data-tab="algebra">Algebra</button>
+                    <button class="function-tab" data-tab="matrix">Matrix</button>
+                    <button class="function-tab" data-tab="constants">Constants</button>
+                </div>
+            </div>
+
+            <!-- Function Grid -->
+            <div class="function-grid" id="functionGrid">
+                <!-- Dynamically populated -->
+            </div>
+
+            <!-- History -->
+            <div class="history-panel">
+                <div class="history-title">History</div>
+                <div id="historyContainer"></div>
+            </div>
+        </div>
+
+        <!-- RIGHT PANEL: GRAPH -->
+        <div class="graph-panel">
+            <div class="graph-card">
+                <div class="graph-header">
+                    <h2>📊 Graph Visualizer</h2>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="graph-btn" onclick="clearGraph()" style="background: rgba(255, 100, 100, 0.3);">Clear</button>
+                        <button class="graph-btn" onclick="saveGraphFolder()">Save</button>
+                    </div>
+                </div>
+
+                <div class="graph-input-group">
+                    <input type="text" class="graph-input" id="graphInput" placeholder="e.g., y = x^2, y = sin(x), y = 2x + 3">
+                    <input type="text" class="graph-input" id="graphColor" placeholder="Color #FF0000" style="width: 120px;">
+                    <button class="graph-btn" onclick="addGraphEquation()">Plot</button>
+                </div>
+
+                <div id="calculator"></div>
+            </div>
+
+            <div class="graph-card">
+                <div class="graph-header">
+                    <h2>📁 Graph Folders</h2>
+                    <button class="graph-btn" onclick="createGraphFolder()">New Folder</button>
+                </div>
+                <div class="graph-management" id="graphManagement">
+                    <div style="color: rgba(255, 255, 255, 0.5); font-size: 12px;">No folders yet</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for folder creation -->
+    <div id="folderModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 1000; display: flex; justify-content: center; align-items: center;">
+        <div style="background: rgba(0,0,0,0.4); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.15); border-radius: 20px; padding: 24px; width: 90%; max-width: 400px;">
+            <h2 style="color: white; margin-bottom: 16px;">Create Graph Folder</h2>
+            <input type="text" id="folderNameInput" placeholder="Enter folder name" style="width: 100%; padding: 12px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.08); color: white; border-radius: 10px; margin-bottom: 16px;">
+            <div style="display: flex; gap: 10px;">
+                <button onclick="createGraphFolderConfirm()" style="flex: 1; padding: 12px; background: rgba(107, 255, 107, 0.3); border: 1px solid rgba(107, 255, 107, 0.5); color: white; border-radius: 10px; cursor: pointer;">Create</button>
+                <button onclick="closeModal()" style="flex: 1; padding: 12px; background: rgba(255, 100, 100, 0.3); border: 1px solid rgba(255, 100, 100, 0.5); color: white; border-radius: 10px; cursor: pointer;">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/calculator.js"></script>
+</body>
+</html>
