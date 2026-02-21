@@ -44,8 +44,8 @@ async function fetchTodos() {
 
               <div>
                 <button class="completeBtn" data-id="${todo.id}" data-completed="${todo.completed}">✔</button>
+                <button class="editBtn" data-id="${todo.id}">✏️</button>
                 <button class="deleteBtn" data-id="${todo.id}">🗑</button>
-                <!-- ADD EDIT BUTTON HERE: <button class="editBtn" data-id="${todo.id}">✏️</button> -->
               </div>
           `;
 
@@ -68,6 +68,14 @@ async function fetchTodos() {
       btn.addEventListener("click", function () {
         const id = this.getAttribute("data-id");
         deleteTask(id);
+      });
+    });
+
+    // STEP 5: Add event listener for edit button
+    document.querySelectorAll(".editBtn").forEach((btn) => {
+      btn.addEventListener("click", function () {
+        const id = this.getAttribute("data-id");
+        editTask(id);
       });
     });
   } catch (error) {
@@ -148,54 +156,90 @@ async function completeTask(id, completed) {
 // ===== EDIT TASK FUNCTION =====
 // STEP 1: Create editTask function to open modal with current task data
 async function editTask(id) {
-  // TODO: Fetch the specific task data from the todos list (from the DOM or API)
-  // TODO: Show the edit modal
-  // TODO: Populate the modal form with current task data (title, priority, due_date)
-  // TODO: Set a data attribute on the modal to track which task ID is being edited
+  // Fetch the specific task data from the current todos to populate the modal
+  const todoList = document.getElementById("todoList");
+  const todoItems = Array.from(todoList.querySelectorAll("li"));
+  
+  // Get the task element that contains this ID
+  const todoElement = todoList.querySelector(`li:has(button[data-id="${id}"])`);
+  
+  // Extract task data from the DOM
+  const titleText = todoElement.querySelector("b").textContent;
+  const priorityText = todoElement.querySelector("span").textContent.match(/\((.*?)\)/)[1];
+  const dueText = todoElement.querySelector("small").textContent.replace("Due: ", "");
+  const dueDate = dueText === "No date" ? "" : dueText;
+  
+  // Populate the modal form with current task data
+  document.getElementById("editTitle").value = titleText;
+  document.getElementById("editPriority").value = priorityText;
+  document.getElementById("editDueDate").value = dateToInput(dueDate);
+  
+  // Store the task ID in the modal for saveEditTask() to use
+  document.getElementById("editModal").setAttribute("data-edit-id", id);
+  
+  // Show the edit modal
+  document.getElementById("editModal").classList.add("active");
 }
 
 // STEP 2: Create saveEditTask function to update task via API
-async function saveEditTask(id) {
-  // TODO: Get the updated values from the form inputs
-  // const updatedTitle = document.getElementById("editTitle").value;
-  // const updatedPriority = document.getElementById("editPriority").value;
-  // const updatedDueDate = document.getElementById("editDueDate").value;
-
-  // TODO: Validate that title is not empty
+async function saveEditTask() {
+  // Get the task ID from the modal's data attribute
+  const id = document.getElementById("editModal").getAttribute("data-edit-id");
   
-  // TODO: Send PUT request to TODO_API + "/" + id with the updated data
-  // const res = await fetch(TODO_API + "/" + id, {
-  //   method: "PUT",
-  //   headers: getAuthHeaders(),
-  //   body: JSON.stringify({
-  //     title: updatedTitle,
-  //     priority: updatedPriority,
-  //     due_date: updatedDueDate
-  //   }),
-  // });
+  // Get the updated values from the form inputs
+  const updatedTitle = document.getElementById("editTitle").value;
+  const updatedPriority = document.getElementById("editPriority").value;
+  const updatedDueDate = document.getElementById("editDueDate").value;
 
-  // TODO: If successful, close modal and refresh todos
-  // TODO: If failed, show error alert
+  // Validate that title is not empty
+  if (!updatedTitle) {
+    alert("Task title cannot be empty");
+    return;
+  }
+  
+  try {
+    // Send PUT request to TODO_API with the updated data
+    const res = await fetch(TODO_API + "/" + id, {
+      method: "PUT",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({
+        title: updatedTitle,
+        priority: updatedPriority,
+        due_date: updatedDueDate
+      }),
+    });
+
+    // If successful, close modal and refresh todos
+    if (res.ok) {
+      cancelEdit();
+      fetchTodos();
+    } else {
+      // If failed, show error alert
+      alert("Failed to update task");
+    }
+  } catch (error) {
+    console.error("Error updating task:", error);
+    alert("Error updating task");
+  }
 }
 
 // STEP 3: Create cancelEdit function to close modal without saving
 function cancelEdit() {
-  // TODO: Hide the edit modal
-  // TODO: Clear the form inputs
+  // Hide the edit modal
+  document.getElementById("editModal").classList.remove("active");
+  
+  // Clear the form inputs
+  document.getElementById("editTitle").value = "";
+  document.getElementById("editPriority").value = "Medium";
+  document.getElementById("editDueDate").value = "";
 }
 
-// STEP 4: Add edit button to the HTML in fetchTodos()
-// In the fetchTodos() function, add this button next to completeBtn and deleteBtn:
-// <button class="editBtn" data-id="${todo.id}">✏️</button>
-
-// STEP 5: Add event listener for edit button in fetchTodos()
-// After the deleteBtn event listeners, add:
-// document.querySelectorAll(".editBtn").forEach((btn) => {
-//   btn.addEventListener("click", function () {
-//     const id = this.getAttribute("data-id");
-//     editTask(id);
-//   });
-// });
+// Helper function to convert date format for input field
+function dateToInput(dateString) {
+  if (!dateString || dateString === "No date") return "";
+  // Assume dateString is in format YYYY-MM-DD, which is what input expects
+  return dateString;
+}
 
 function checkNotification(todo) {
   if (!todo.due_date) return;

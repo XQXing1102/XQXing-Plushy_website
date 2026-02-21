@@ -212,6 +212,7 @@ button:hover::after{
 
 /* small action buttons */
 .completeBtn,
+.editBtn,
 .deleteBtn{
     width:38px;
     height:38px;
@@ -235,13 +236,132 @@ button:hover::after{
 }
 
 /* ===== EDIT MODAL STYLES ===== */
-/* TODO: Add styles for:
-   - .edit-modal { display: none; position: fixed; ... } (hidden by default)
-   - .edit-modal.active { display: flex; } (shown when editing)
-   - .modal-overlay { background: rgba(0,0,0,.7); } (dark background)
-   - .modal-content { background: glass effect; padding; border-radius; }
-   - .editBtn { width: 38px; height: 38px; } (match complete/delete button size)
-*/
+.edit-modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  justify-content: center;
+  align-items: center;
+}
+
+.edit-modal.active {
+  display: flex;
+}
+
+.modal-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(5px);
+}
+
+.modal-content {
+  position: relative;
+  z-index: 1001;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(30px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 24px;
+  padding: 28px;
+  max-width: 500px;
+  width: 90%;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  color: white;
+}
+
+.modal-content h2 {
+  margin-top: 0;
+  margin-bottom: 20px;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.modal-form-group {
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-form-group label {
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 8px;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.modal-form-group input,
+.modal-form-group select {
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: none;
+  outline: none;
+  color: white;
+  font-size: 14px;
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(20px);
+  transition: 0.3s;
+}
+
+.modal-form-group input::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.modal-form-group input:focus,
+.modal-form-group select:focus {
+  background: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
+}
+
+.modal-buttons {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.modal-btn {
+  flex: 1;
+  height: 40px;
+  border-radius: 12px;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  position: relative;
+  overflow: hidden;
+  color: white;
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(25px);
+  transition: 0.3s cubic-bezier(0.2, 0.9, 0.25, 1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-btn:hover {
+  transform: translateY(-2px);
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.modal-btn:active {
+  transform: scale(0.95);
+}
+
+.save-btn {
+  background: rgba(76, 175, 80, 0.3);
+}
+
+.save-btn:hover {
+  background: rgba(76, 175, 80, 0.5);
+}
+
+.cancel-btn {
+  background: rgba(255, 152, 0, 0.3);
+}
+
+.cancel-btn:hover {
+  background: rgba(255, 152, 0, 0.5);
+}
 
 </style>
 
@@ -283,16 +403,38 @@ button:hover::after{
     <ul id="todoList"></ul>
 
     <!-- ===== EDIT MODAL ===== -->
-    <!-- TODO: Create an edit modal here with:
-         - Hidden by default (display: none or hidden class)
-         - Modal overlay (dark background)
-         - Edit form with:
-           * Input for title (id="editTitle")
-           * Select for priority (id="editPriority")
-           * Input for due date (id="editDueDate")
-           * Save button (onclick="saveEditTask(currentEditId)")
-           * Cancel button (onclick="cancelEdit()")
-    -->
+    <div id="editModal" class="edit-modal">
+      <div class="modal-overlay" onclick="cancelEdit()"></div>
+      <div class="modal-content">
+        <h2>Edit Task</h2>
+        
+        <form onsubmit="event.preventDefault(); saveEditTask();">
+          <div class="modal-form-group">
+            <label for="editTitle">Task Title:</label>
+            <input type="text" id="editTitle" placeholder="Enter task title..." required>
+          </div>
+
+          <div class="modal-form-group">
+            <label for="editPriority">Priority:</label>
+            <select id="editPriority">
+              <option value="Low">Low</option>
+              <option value="Medium">Medium</option>
+              <option value="High">High</option>
+            </select>
+          </div>
+
+          <div class="modal-form-group">
+            <label for="editDueDate">Due Date:</label>
+            <input type="date" id="editDueDate">
+          </div>
+
+          <div class="modal-buttons">
+            <button type="submit" class="modal-btn save-btn"><span>Save</span></button>
+            <button type="button" class="modal-btn cancel-btn" onclick="cancelEdit()"><span>Cancel</span></button>
+          </div>
+        </form>
+      </div>
+    </div>
 
   </div>
 
