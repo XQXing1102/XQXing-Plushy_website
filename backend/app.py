@@ -43,11 +43,20 @@ def init_db():
         title TEXT,
         priority TEXT,
         due_date TEXT,
+        due_time TEXT DEFAULT '23:59',
         completed INTEGER DEFAULT 0,
         FOREIGN KEY (user_id) REFERENCES users(id),
         FOREIGN KEY (folder_id) REFERENCES folders(id)
     )
     """)
+    
+    # Add due_time column if it doesn't exist (for existing databases)
+    try:
+        conn.execute("ALTER TABLE todos ADD COLUMN due_time TEXT DEFAULT '23:59'")
+        conn.commit()
+    except:
+        pass  # Column already exists
+    
     conn.commit()
     conn.close()
 
@@ -173,8 +182,8 @@ def add_todo():
     try:
         conn = get_db()
         conn.execute(
-            "INSERT INTO todos (user_id, folder_id, title, priority, due_date) VALUES (?, ?, ?, ?, ?)",
-            (user_id, data.get("folder_id"), data["title"], data["priority"], data.get("due_date", ""))
+            "INSERT INTO todos (user_id, folder_id, title, priority, due_date, due_time) VALUES (?, ?, ?, ?, ?, ?)",
+            (user_id, data.get("folder_id"), data["title"], data["priority"], data.get("due_date", ""), data.get("due_time", "23:59"))
         )
         conn.commit()
         conn.close()
@@ -203,13 +212,14 @@ def update_todo(id):
     title = data.get("title") if data.get("title") else todo["title"]
     priority = data.get("priority") if data.get("priority") else todo["priority"]
     due_date = data.get("due_date") if data.get("due_date") else todo["due_date"]
+    due_time = data.get("due_time") if data.get("due_time") else todo["due_time"]
     completed = data.get("completed")
 
     conn.execute("""
         UPDATE todos 
-        SET title=?, priority=?, due_date=?, completed=? 
+        SET title=?, priority=?, due_date=?, due_time=?, completed=? 
         WHERE id=? AND user_id=?
-    """, (title, priority, due_date, completed, id, user_id))
+    """, (title, priority, due_date, due_time, completed, id, user_id))
 
     conn.commit()
     conn.close()

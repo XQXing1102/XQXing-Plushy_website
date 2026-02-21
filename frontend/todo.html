@@ -54,7 +54,7 @@
 ================================ */
 .todo-input{
   display:grid;
-  grid-template-columns:1fr 140px 160px 110px;
+  grid-template-columns:1fr 140px 160px 120px 70px 110px;
   gap:12px;
   margin-bottom:18px;
 }
@@ -199,24 +199,31 @@ button:hover::after{
   border:1px solid rgba(255,255,255,.12);
   box-shadow:0 8px 20px rgba(0,0,0,.4);
 
-  margin-bottom:12px;
-  padding:14px 16px;
-  border-radius:16px;
+  margin-bottom:8px;
+  padding:10px 12px;
+  border-radius:14px;
   color:white;
 
   display:flex;
   justify-content:space-between;
   align-items:center;
-  font-size:14px;
+  font-size:13px;
 }
 
 /* small action buttons */
+.todo-actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
 .completeBtn,
 .editBtn,
 .deleteBtn{
-    width:38px;
-    height:38px;
-    border-radius:12px;
+    width:32px;
+    height:32px;
+    border-radius:8px;
+    font-size:12px;
 }
 
 /* ===============================
@@ -612,6 +619,13 @@ button:hover::after{
       </select>
 
       <input type="date" id="dueDate">
+      
+      <input type="time" id="dueTime">
+      
+      <button id="timeFormatBtn" class="ios-glass-btn" onclick="toggleTimeFormat()">
+        <span>24H</span>
+      </button>
+      
       <button id="addTaskButton" class="ios-glass-btn">
       <span>Add</span>
 </button>
@@ -644,6 +658,11 @@ button:hover::after{
           <div class="modal-form-group">
             <label for="editDueDate">Due Date:</label>
             <input type="date" id="editDueDate">
+          </div>
+
+          <div class="modal-form-group">
+            <label for="editDueTime">Due Time:</label>
+            <input type="time" id="editDueTime">
           </div>
 
           <div class="modal-buttons">

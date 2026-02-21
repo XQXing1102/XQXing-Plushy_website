@@ -3,6 +3,7 @@ const FOLDERS_API = "http://127.0.0.1:9999/folders";
 
 // ===== GLOBAL STATE FOR FOLDERS =====
 let currentFolderId = null; // Track which folder is currently selected
+let timeFormat = localStorage.getItem("timeFormat") || "24h"; // 24h or 12h
 
 function getAuthHeaders() {
   const token = getToken();
@@ -10,6 +11,36 @@ function getAuthHeaders() {
     "Content-Type": "application/json",
     Authorization: `Bearer ${token}`,
   };
+}
+
+// ===== TIME FORMAT HELPER FUNCTIONS =====
+// Convert 24-hour time to 12-hour AM/PM format
+function convertTo12Hour(time24) {
+  if (!time24) return "No time";
+  const [hours, minutes] = time24.split(":");
+  const h = parseInt(hours);
+  const m = minutes || "00";
+  const period = h >= 12 ? "PM" : "AM";
+  const h12 = h % 12 || 12;
+  return `${h12}:${m} ${period}`;
+}
+
+// Format time for display based on user's preference
+function formatTimeDisplay(time) {
+  if (!time) return "No time";
+  return timeFormat === "12h" ? convertTo12Hour(time) : time;
+}
+
+// Toggle time format between 12h and 24h
+function toggleTimeFormat() {
+  timeFormat = timeFormat === "24h" ? "12h" : "24h";
+  localStorage.setItem("timeFormat", timeFormat);
+  // Update display
+  const formatBtn = document.getElementById("timeFormatBtn");
+  if (formatBtn) {
+    formatBtn.textContent = timeFormat === "24h" ? "24H" : "12H";
+  }
+  fetchTodos(currentFolderId);
 }
 
 async function fetchTodos(folderId = null) {
@@ -44,15 +75,22 @@ async function fetchTodos(folderId = null) {
                 <b>${todo.title}</b> 
                 <span class="${priorityClass}">(${todo.priority})</span>
                 <br>
-                <small>Due: ${todo.due_date || "No date"}</small>
+                <small>Due: ${todo.due_date || "No date"} @ ${formatTimeDisplay(todo.due_time || "23:59")}</small>
               </div>
 
-              <div>
+              <div class="todo-actions">
                 <button class="completeBtn" data-id="${todo.id}" data-completed="${todo.completed}">✔</button>
                 <button class="editBtn" data-id="${todo.id}">✏️</button>
                 <button class="deleteBtn" data-id="${todo.id}">🗑</button>
               </div>
           `;
+
+      // Store task data in data attributes for editing
+      li.setAttribute("data-todo-id", todo.id);
+      li.setAttribute("data-todo-title", todo.title);
+      li.setAttribute("data-todo-priority", todo.priority);
+      li.setAttribute("data-todo-date", todo.due_date || "");
+      li.setAttribute("data-todo-time", todo.due_time || "23:59");
 
       if (todo.completed) li.style.opacity = "0.5";
 
@@ -93,6 +131,7 @@ async function addTask() {
   const title = document.getElementById("title").value;
   const priority = document.getElementById("priority").value;
   let dueDate = document.getElementById("dueDate").value;
+  let dueTime = document.getElementById("dueTime").value;
 
   // If no date provided, default to today's local date
   if (!dueDate) {
@@ -103,7 +142,12 @@ async function addTask() {
     dueDate = `${year}-${month}-${day}`;
   }
 
-  console.log("Task data:", { title, priority, dueDate });
+  // If no time provided, default to 23:59
+  if (!dueTime) {
+    dueTime = "23:59";
+  }
+
+  console.log("Task data:", { title, priority, dueDate, dueTime });
 
   if (!title) return alert("Enter task");
 
@@ -116,6 +160,7 @@ async function addTask() {
         title, 
         priority, 
         due_date: dueDate,
+        due_time: dueTime,
         folder_id: currentFolderId
       }),
     });
@@ -124,6 +169,7 @@ async function addTask() {
 
     if (res.ok) {
       document.getElementById("title").value = "";
+      document.getElementById("dueTime").value = "";
       fetchTodos(currentFolderId);
     } else {
       const errorData = await res.json();
@@ -175,23 +221,26 @@ async function completeTask(id, completed) {
 // ===== EDIT TASK FUNCTION =====
 // STEP 1: Create editTask function to open modal with current task data
 async function editTask(id) {
-  // Fetch the specific task data from the current todos to populate the modal
-  const todoList = document.getElementById("todoList");
-  const todoItems = Array.from(todoList.querySelectorAll("li"));
-  
   // Get the task element that contains this ID
-  const todoElement = todoList.querySelector(`li:has(button[data-id="${id}"])`);
+  const todoList = document.getElementById("todoList");
+  const todoElement = todoList.querySelector(`li[data-todo-id="${id}"]`);
   
-  // Extract task data from the DOM
-  const titleText = todoElement.querySelector("b").textContent;
-  const priorityText = todoElement.querySelector("span").textContent.match(/\((.*?)\)/)[1];
-  const dueText = todoElement.querySelector("small").textContent.replace("Due: ", "");
-  const dueDate = dueText === "No date" ? "" : dueText;
+  if (!todoElement) {
+    alert("Task not found");
+    return;
+  }
+
+  // Extract task data from the data attributes
+  const titleText = todoElement.getAttribute("data-todo-title");
+  const priorityText = todoElement.getAttribute("data-todo-priority");
+  const dueDate = todoElement.getAttribute("data-todo-date");
+  const dueTime = todoElement.getAttribute("data-todo-time") || "23:59";
   
   // Populate the modal form with current task data
   document.getElementById("editTitle").value = titleText;
   document.getElementById("editPriority").value = priorityText;
-  document.getElementById("editDueDate").value = dateToInput(dueDate);
+  document.getElementById("editDueDate").value = dueDate;
+  document.getElementById("editDueTime").value = dueTime;
   
   // Store the task ID in the modal for saveEditTask() to use
   document.getElementById("editModal").setAttribute("data-edit-id", id);
@@ -209,6 +258,7 @@ async function saveEditTask() {
   const updatedTitle = document.getElementById("editTitle").value;
   const updatedPriority = document.getElementById("editPriority").value;
   const updatedDueDate = document.getElementById("editDueDate").value;
+  const updatedDueTime = document.getElementById("editDueTime").value || "23:59";
 
   // Validate that title is not empty
   if (!updatedTitle) {
@@ -224,7 +274,8 @@ async function saveEditTask() {
       body: JSON.stringify({
         title: updatedTitle,
         priority: updatedPriority,
-        due_date: updatedDueDate
+        due_date: updatedDueDate,
+        due_time: updatedDueTime
       }),
     });
 
@@ -464,6 +515,12 @@ document.addEventListener("DOMContentLoaded", () => {
     console.log("Attached click listener to addTaskButton");
   } else {
     console.error("addTaskButton not found!");
+  }
+  
+  // Initialize time format button
+  const timeFormatBtn = document.getElementById("timeFormatBtn");
+  if (timeFormatBtn) {
+    timeFormatBtn.textContent = timeFormat === "24h" ? "24H" : "12H";
   }
   
   // Initialize folders on page load
