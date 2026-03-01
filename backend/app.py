@@ -58,6 +58,13 @@ def init_db():
     )
     """)
     
+    # Add folder_id column if it doesn't exist
+    try:
+        conn.execute("ALTER TABLE todos ADD COLUMN folder_id INTEGER")
+        conn.commit()
+    except:
+        pass  # Column already exists
+
     # Add due_time column if it doesn't exist (for existing databases)
     try:
         conn.execute("ALTER TABLE todos ADD COLUMN due_time TEXT DEFAULT '23:59'")
@@ -104,15 +111,15 @@ def send_reminder_email(to_email, task_title, due_datetime_str):
     try:
         msg = MIMEMultipart("alternative")
         msg["Subject"] = f"Reminder: Task due soon — {task_title}"
-        msg["From"] = cfg["from_email"]
-        msg["To"] = to_email
+        msg["From"] = str(cfg["from_email"])
+        msg["To"] = str(to_email)
         text = f"Your task \"{task_title}\" is due in about 1 hour.\n\nDue: {due_datetime_str}\n\n— XQXing-Plushy Todo"
         msg.attach(MIMEText(text, "plain"))
-        with smtplib.SMTP(cfg["host"], cfg["port"]) as server:
+        with smtplib.SMTP(str(cfg["host"]), int(cfg["port"])) as server:
             if cfg["use_tls"]:
                 server.starttls()
-            server.login(cfg["user"], cfg["password"])
-            server.sendmail(cfg["from_email"], to_email, msg.as_string())
+            server.login(str(cfg["user"]), str(cfg["password"]))
+            server.sendmail(str(cfg["from_email"]), to_email, msg.as_string())
         return True
     except Exception as e:
         print(f"SMTP error sending to {to_email}: {e}")
@@ -126,6 +133,7 @@ def check_and_send_reminders():
     now = datetime.now()
     window_end = now + timedelta(hours=1)
     conn = get_db()
+    sent_counts = [0]
     try:
         todos = conn.execute(
             """SELECT t.id, t.user_id, t.title, t.due_date, t.due_time
@@ -133,7 +141,6 @@ def check_and_send_reminders():
                WHERE t.due_date IS NOT NULL AND t.due_date != ''
                  AND t.completed = 0 AND (t.reminder_sent IS NULL OR t.reminder_sent = 0)"""
         ).fetchall()
-        sent = 0
         for row in todos:
             due_date = (row["due_date"] or "").strip()
             due_time = (row["due_time"] or "23:59").strip()
@@ -160,12 +167,12 @@ def check_and_send_reminders():
                 if send_reminder_email(to_email, row["title"], due_str):
                     conn.execute("UPDATE todos SET reminder_sent=1 WHERE id=?", (row["id"],))
                     conn.commit()
-                    sent += 1
+                    sent_counts[0] += 1
                     print(f"[Reminder] Sent OK for task id={row['id']}")
                 else:
                     print(f"[Reminder] Failed to send for task id={row['id']}")
-        if sent or todos:
-            print(f"[Reminder] Check done: {len(todos)} candidate(s), {sent} email(s) sent. Now={now.strftime('%Y-%m-%d %H:%M')}, window_end={window_end.strftime('%Y-%m-%d %H:%M')}")
+        if sent_counts[0] or todos:
+            print(f"[Reminder] Check done: {len(todos)} candidate(s), {sent_counts[0]} email(s) sent. Now={now.strftime('%Y-%m-%d %H:%M')}, window_end={window_end.strftime('%Y-%m-%d %H:%M')}")
     except Exception as e:
         print(f"[Reminder] Error: {e}")
     finally:
@@ -324,13 +331,13 @@ def update_todo(id):
         return jsonify({"message": "Todo not found"}), 404
 
     # get old values if blank update request
-    title = data.get("title") if data.get("title") else todo["title"]
-    priority = data.get("priority") if data.get("priority") else todo["priority"]
-    due_date = data.get("due_date") if data.get("due_date") else todo["due_date"]
-    due_time = data.get("due_time") if data.get("due_time") else todo["due_time"]
-    completed = data.get("completed")
+    title = data.get("title") if data.get("title") is not None else todo["title"]
+    priority = data.get("priority") if data.get("priority") is not None else todo["priority"]
+    due_date = data.get("due_date") if data.get("due_date") is not None else todo["due_date"]
+    due_time = data.get("due_time") if data.get("due_time") is not None else todo["due_time"]
+    completed = data.get("completed") if data.get("completed") is not None else todo["completed"]
     # Reset reminder_sent when due date/time changes so user gets a new reminder
-    reset_reminder = data.get("due_date") is not None or data.get("due_time") is not None
+    reset_reminder = (data.get("due_date") is not None and data.get("due_date") != todo["due_date"]) or (data.get("due_time") is not None and data.get("due_time") != todo["due_time"])
     reminder_sent = 0 if reset_reminder else (todo["reminder_sent"] if "reminder_sent" in todo.keys() else 0)
 
     conn.execute("""

@@ -66,6 +66,7 @@ class Calculator {
 
             // Add to Desmos
             this.desmos.setExpression({
+                id: input,
                 latex: equation,
                 color: color,
             });
@@ -141,9 +142,11 @@ class Calculator {
         this.clearGraph();
         folder.graphs.forEach(graph => {
             this.desmos.setExpression({
+                id: graph.expression,
                 latex: graph.latex,
                 color: graph.color,
             });
+            this.currentGraphs.set(graph.expression, { latex: graph.latex, color: graph.color });
         });
     }
 
@@ -701,7 +704,8 @@ class Calculator {
     // ===== EXPRESSION EVALUATION =====
     evaluateExpression(expr) {
         try {
-            let e = String(expr).trim();
+            // Remove semicolons and trim to prevent inline JS syntax errors
+            let e = String(expr).trim().replace(/;/g, '');
             const parenCheck = this.checkParentheses(e);
             if (!parenCheck.ok) return parenCheck.msg;
 
@@ -737,7 +741,7 @@ class Calculator {
             ];
             funcs.forEach(fn => {
                 const re = new RegExp('\\b' + fn + '\\s*\\(', 'g');
-                e = e.replace(re, '(this.' + fn + '(');
+                e = e.replace(re, 'this.' + fn + '(');
             });
 
             const result = Function('"use strict"; return (' + e + ');').call(this);
