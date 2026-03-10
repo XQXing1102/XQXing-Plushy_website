@@ -11,16 +11,21 @@
 
 <div class="dashboard-container">
   
-  <header class="glass-header">
-    <div class="brand">
-      <h1>XQXing-Plushy</h1>
+  <header class="global-glass-header" style="grid-template-columns: 1fr auto 1fr;">
+    <div class="header-left">
+      <!-- Spacer for center alignment -->
+    </div>
+    
+    <div class="header-center">
+      <h2>✨ XQXing-Plushy</h2>
       <p>All online tools in one place</p>
     </div>
     
-    <div class="auth-profile" style="display: flex; align-items: center; gap: 15px;">
-      <span id="username-display" style="color: white; font-size: 14px;"></span>
-      <button class="liquid-btn" style="padding: 10px 20px; margin: 0; width: auto; height: 30px; font-size: 9px;" onclick="logout()">
+    <div class="header-right auth-profile">
+      <span id="username-display" class="user-name"></span>
+      <button class="nav-logout-btn icon-text-btn" onclick="logout()">
         <span>Logout</span>
+        <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
       </button>
     </div>
   </header>
@@ -32,9 +37,9 @@
     <a href="pomodoro.html" class="tool-tile">
       <div class="tile-core"><span>🍅 Pomodoro Timer</span></div>
     </a>
-    <div class="tool-tile disabled">
-      <div class="tile-core"><span>JSON Formatter</span></div>
-    </div>
+    <a href="json-formatter.html" class="tool-tile">
+      <div class="tile-core"><span>📄 JSON Formatter</span></div>
+    </a>
     <a href="calculator.html" class="tool-tile">
       <div class="tile-core"><span>🧮 Scientific Calculator</span></div>
     </a>

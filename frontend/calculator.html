@@ -552,22 +552,32 @@
     <div class="container">
         <!-- LEFT PANEL: CALCULATOR -->
         <div class="calc-panel">
-            <div class="calc-header">
-                <h1>🧮 Calc Pro</h1>
-                <div class="mode-buttons">
-                    <button class="mode-btn active" id="degreeMode" data-mode="degree">DEG</button>
-                    <button class="mode-btn" id="radianMode" data-mode="radian">RAD</button>
-                    <button class="mode-btn" id="gradMode" data-mode="grad">GRAD</button>
-                    <button class="mode-btn active" id="fixMode" data-display="fix">FIX</button>
-                    <button class="mode-btn" id="sciMode" data-display="sci">SCI</button>
-                    <button class="mode-btn" id="engMode" data-display="eng">ENG</button>
-                    <span id="calc-username"
-                        style="font-size: 13px; font-weight: 500; color: rgba(0,0,0,0.7); margin-left: auto;"></span>
-                    <a href="index.html" class="calc-nav-btn">Dashboard</a>
-                    <button type="button" class="calc-nav-btn" onclick="logout()"
-                        style="border: none; cursor: pointer; font: inherit;">Logout</button>
+            <header class="global-glass-header" style="margin-bottom: 20px;">
+                <div class="header-left">
+                    <a href="index.html" class="nav-back-btn icon-text-btn" style="color:#1d1d1f; border-color:rgba(0,0,0,0.1); background:rgba(255,255,255,0.4);">
+                        <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                        <span>Back</span>
+                    </a>
                 </div>
-            </div>
+                
+                <div class="header-center">
+                    <h2 style="color:#1d1d1f;">🧮 Calc Pro</h2>
+                </div>
+                
+                <div class="header-right auth-profile" style="flex-wrap: wrap;">
+                    <div class="mode-buttons" style="margin-right: 15px;">
+                        <button class="mode-btn active" id="degreeMode" data-mode="degree">DEG</button>
+                        <button class="mode-btn" id="radianMode" data-mode="radian">RAD</button>
+                        <button class="mode-btn" id="gradMode" data-mode="grad">GRAD</button>
+                    </div>
+                    
+                    <span id="calc-username" class="user-name" style="color: rgba(0,0,0,0.7);"></span>
+                    <button class="nav-logout-btn icon-text-btn" onclick="logout()">
+                        <span>Logout</span>
+                        <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                    </button>
+                </div>
+            </header>
 
             <!-- Display -->
             <div class="display-area">

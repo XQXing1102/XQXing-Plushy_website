@@ -200,3 +200,122 @@ a.tool-tile .tile-core{
     height:100px;
   }
 }
+
+/* --- GLOBAL UI COMPONENTS --- */
+
+/* Glass Header (Shared across all apps) */
+.global-glass-header {
+  display: grid;
+  align-items: center;
+  padding: 15px 25px;
+  margin-top: 15px;
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(25px);
+  -webkit-backdrop-filter: blur(25px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 18px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  width: 100%;
+  margin-bottom: 30px;
+}
+
+.global-glass-header {
+  opacity:0;
+  transform:translateY(20px);
+  transition:.6s cubic-bezier(.2,.9,.25,1);
+  animation: slideFadeIn 0.6s cubic-bezier(0.2, 0.9, 0.25, 1) forwards;
+}
+
+@keyframes slideFadeIn {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.header-left {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.header-center h2, .header-center h1 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #fff;
+  letter-spacing: 0.5px;
+  text-align: center;
+}
+
+.header-center p {
+  margin: 2px 0 0;
+  font-size: 13px;
+  opacity: .7;
+  color: #fff;
+  text-align: center;
+}
+
+.header-right {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 15px;
+}
+
+.user-name {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.icon-text-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.icon-text-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.icon-text-btn svg {
+  opacity: 0.8;
+  transition: transform 0.3s ease;
+}
+
+.icon-text-btn:hover svg {
+  transform: scale(1.1);
+}
+
+.nav-logout-btn {
+  padding: 8px 14px;
+  background: rgba(255, 107, 107, 0.15);
+  border-color: rgba(255, 107, 107, 0.3);
+  color: #ff8e8e;
+}
+
+.nav-logout-btn:hover {
+  background: rgba(255, 107, 107, 0.25);
+}
+
+@media(max-width: 768px) {
+  .global-glass-header {
+    display: flex !important;
+    flex-direction: column;
+    gap: 10px;
+    text-align: center;
+    padding: 14px;
+  }
+}
