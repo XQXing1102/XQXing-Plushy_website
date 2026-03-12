@@ -65,6 +65,31 @@ def init_db():
     except:
         pass  # Column already exists
 
+    # Notes features
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS notebooks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+    """)
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS notes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        notebook_id INTEGER NOT NULL,
+        section TEXT NOT NULL DEFAULT 'General',
+        title TEXT NOT NULL,
+        content TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id),
+        FOREIGN KEY (notebook_id) REFERENCES notebooks(id)
+    )
+    """)
+
     # Add due_time column if it doesn't exist (for existing databases)
     try:
         conn.execute("ALTER TABLE todos ADD COLUMN due_time TEXT DEFAULT '23:59'")
@@ -503,6 +528,141 @@ def delete_folder(id):
     conn.commit()
     conn.close()
     return jsonify({"message": "Folder deleted"})
+
+# ===== NOTES & NOTEBOOKS ENDPOINTS =====
+@app.route("/notebooks", methods=["GET"])
+def get_notebooks():
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    user_id = verify_token(token)
+    if not user_id: return jsonify({"message": "Unauthorized"}), 401
+
+    conn = get_db()
+    notebooks = conn.execute("SELECT * FROM notebooks WHERE user_id=? ORDER BY created_at DESC", (user_id,)).fetchall()
+    
+    if not notebooks:
+        conn.execute("INSERT INTO notebooks (user_id, name) VALUES (?, ?)", (user_id, "My First Notebook"))
+        conn.commit()
+        notebooks = conn.execute("SELECT * FROM notebooks WHERE user_id=? ORDER BY created_at DESC", (user_id,)).fetchall()
+    
+    conn.close()
+    return jsonify([dict(row) for row in notebooks])
+
+@app.route("/notebooks", methods=["POST"])
+def create_notebook():
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    user_id = verify_token(token)
+    if not user_id: return jsonify({"message": "Unauthorized"}), 401
+
+    data = request.json
+    name = data.get("name")
+    if not name: return jsonify({"message": "Missing notebook name"}), 400
+
+    conn = get_db()
+    conn.execute("INSERT INTO notebooks (user_id, name) VALUES (?, ?)", (user_id, name))
+    conn.commit()
+    conn.close()
+    return jsonify({"message": "Notebook created"}), 201
+
+@app.route("/notebooks/<int:id>", methods=["DELETE"])
+def delete_notebook(id):
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    user_id = verify_token(token)
+    if not user_id: return jsonify({"message": "Unauthorized"}), 401
+
+    conn = get_db()
+    nb = conn.execute("SELECT * FROM notebooks WHERE id=? AND user_id=?", (id, user_id)).fetchone()
+    if not nb:
+        conn.close()
+        return jsonify({"message": "Notebook not found"}), 404
+
+    conn.execute("DELETE FROM notes WHERE notebook_id=? AND user_id=?", (id, user_id))
+    conn.execute("DELETE FROM notebooks WHERE id=? AND user_id=?", (id, user_id))
+    conn.commit()
+    conn.close()
+    return jsonify({"message": "Notebook deleted"})
+
+@app.route("/notes", methods=["GET"])
+def get_notes():
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    user_id = verify_token(token)
+    if not user_id: return jsonify({"message": "Unauthorized"}), 401
+
+    notebook_id = request.args.get("notebook_id")
+    conn = get_db()
+    
+    if notebook_id:
+        notes = conn.execute("SELECT * FROM notes WHERE user_id=? AND notebook_id=? ORDER BY updated_at DESC", (user_id, notebook_id)).fetchall()
+    else:
+        notes = conn.execute("SELECT * FROM notes WHERE user_id=? ORDER BY updated_at DESC", (user_id,)).fetchall()
+    
+    conn.close()
+    return jsonify([dict(row) for row in notes])
+
+@app.route("/notes", methods=["POST"])
+def add_note():
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    user_id = verify_token(token)
+    if not user_id: return jsonify({"message": "Unauthorized"}), 401
+
+    data = request.json
+    notebook_id = data.get("notebook_id")
+    title = data.get("title", "Untitled")
+    section = data.get("section", "General")
+    content = data.get("content", "")
+
+    if not notebook_id: return jsonify({"message": "Missing notebook ID"}), 400
+
+    conn = get_db()
+    cursor = conn.execute(
+        "INSERT INTO notes (user_id, notebook_id, section, title, content) VALUES (?, ?, ?, ?, ?)",
+        (user_id, notebook_id, section, title, content)
+    )
+    conn.commit()
+    note_id = cursor.lastrowid
+    conn.close()
+    return jsonify({"message": "Note added", "id": note_id}), 201
+
+@app.route("/notes/<int:id>", methods=["PUT"])
+def update_note(id):
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    user_id = verify_token(token)
+    if not user_id: return jsonify({"message": "Unauthorized"}), 401
+
+    data = request.json
+    conn = get_db()
+    note = conn.execute("SELECT * FROM notes WHERE id=? AND user_id=?", (id, user_id)).fetchone()
+    if not note:
+        conn.close()
+        return jsonify({"message": "Note not found"}), 404
+
+    title = data.get("title") if data.get("title") is not None else note["title"]
+    section = data.get("section") if data.get("section") is not None else note["section"]
+    content = data.get("content") if data.get("content") is not None else note["content"]
+
+    conn.execute(
+        "UPDATE notes SET title=?, section=?, content=?, updated_at=CURRENT_TIMESTAMP WHERE id=? AND user_id=?",
+        (title, section, content, id, user_id)
+    )
+    conn.commit()
+    conn.close()
+    return jsonify({"message": "Updated"})
+
+@app.route("/notes/<int:id>", methods=["DELETE"])
+def delete_note(id):
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    user_id = verify_token(token)
+    if not user_id: return jsonify({"message": "Unauthorized"}), 401
+
+    conn = get_db()
+    note = conn.execute("SELECT * FROM notes WHERE id=? AND user_id=?", (id, user_id)).fetchone()
+    if not note:
+        conn.close()
+        return jsonify({"message": "Note not found"}), 404
+
+    conn.execute("DELETE FROM notes WHERE id=? AND user_id=?", (id, user_id))
+    conn.commit()
+    conn.close()
+    return jsonify({"message": "Deleted"})
 
 # Serve frontend static files (must be AFTER all API routes)
 @app.route("/<path:filename>")

@@ -985,11 +985,13 @@ class Calculator {
                 { label: 'Mean', action: 'showStatsUI("mean")' },
                 { label: 'Median', action: 'showStatsUI("median")' },
                 { label: 'Mode', action: 'showStatsUI("mode")' },
+                { label: 'Weighted Mean', action: 'showWeightedMeanUI' },
                 { label: 'σ', action: 'showStatsUI("std")' },
                 { label: 'Variance', action: 'showStatsUI("variance")' },
                 { label: 'Σx²', action: 'showStatsUI("sumSq")' },
                 { label: 'RND', fn: 'Math.random()' },
                 { label: 'RandInt', action: 'showRandIntUI' },
+                { label: 'Normal PDF', action: 'showNormalPDFUI' },
                 { label: 'Normal CDF', action: 'showNormalCDFUI' },
                 { label: 'GCD', fn: 'this.gcd(' },
                 { label: 'LCM', fn: 'this.lcm(' },
@@ -1002,9 +1004,8 @@ class Calculator {
                 { label: 'M-', action: 'memorySubtract' },
                 { label: 'MC', action: 'memoryClear' },
                 { label: 'MR', action: 'memoryRecall' },
-                { label: 'STO→A', action: 'storeVar("A")' },
-                { label: 'STO→B', action: 'storeVar("B")' },
-                { label: 'STO→C', action: 'storeVar("C")' },
+                { label: 'STO→Var', action: 'showStoreVarUI' },
+                { label: 'Recall Var', action: 'showRecallVarUI' },
                 { label: 'A', action: 'recallVar("A")' },
                 { label: 'B', action: 'recallVar("B")' },
                 { label: 'C', action: 'recallVar("C")' },
@@ -1018,6 +1019,7 @@ class Calculator {
                 { label: 'floor', fn: 'floor(' },
                 { label: 'ceil', fn: 'ceil(' },
                 { label: 'round', fn: 'round(' },
+                { label: 'Poly Eval', action: 'showPolyEvalUI' },
                 { label: 'Quadratic', action: 'showQuadraticSolver' },
                 { label: '2×2 Linear', action: 'showLinear2x2UI' },
                 { label: '3×3 Linear', action: 'showLinear3x3UI' },
@@ -1050,6 +1052,8 @@ class Calculator {
                 { label: 'Inflection', action: 'showInflectionUI' },
             ],
             vectors: [
+                { label: 'Vector +', action: 'showVectorAddUI' },
+                { label: 'Vector −', action: 'showVectorSubUI' },
                 { label: 'Dot', action: 'showVectorDotUI' },
                 { label: '|v|', action: 'showVectorMagUI' },
                 { label: 'Angle', action: 'showVectorAngleUI' },
@@ -1098,11 +1102,16 @@ class Calculator {
                     else if (f.action === 'memorySubtract') this.memorySubtract();
                     else if (f.action === 'memoryClear') this.memoryClear();
                     else if (f.action === 'memoryRecall') this.memoryRecall();
+                    else if (f.action === 'showStoreVarUI') this.showStoreVarUI();
+                    else if (f.action === 'showRecallVarUI') this.showRecallVarUI();
                     else if (f.action.startsWith('storeVar')) this.storeVar(f.action.slice(9, -2));
                     else if (f.action.startsWith('recallVar')) this.recallVar(f.action.slice(10, -2));
                     else if (f.action.startsWith('showStatsUI')) this.showStatsUI(f.action.slice(12, -2));
+                    else if (f.action === 'showWeightedMeanUI') this.showWeightedMeanUI();
                     else if (f.action === 'showRandIntUI') this.showRandIntUI();
+                    else if (f.action === 'showNormalPDFUI') this.showNormalPDFUI();
                     else if (f.action === 'showNormalCDFUI') this.showNormalCDFUI();
+                    else if (f.action === 'showPolyEvalUI') this.showPolyEvalUI();
                     else if (f.action === 'showQuadraticSolver') this.showQuadraticSolver();
                     else if (f.action === 'showLinear2x2UI') this.showLinear2x2UI();
                     else if (f.action === 'showLinear3x3UI') this.showLinear3x3UI();
@@ -1114,6 +1123,8 @@ class Calculator {
                     else if (f.action === 'showMatrixMulUI') this.showMatrixMulUI();
                     else if (f.action === 'showPolarToRectUI') this.showPolarToRectUI();
                     else if (f.action === 'showRectToPolarUI') this.showRectToPolarUI();
+                    else if (f.action === 'showVectorAddUI') this.showVectorAddUI();
+                    else if (f.action === 'showVectorSubUI') this.showVectorSubUI();
                     else if (f.action === 'showVectorDotUI') this.showVectorDotUI();
                     else if (f.action === 'showVectorMagUI') this.showVectorMagUI();
                     else if (f.action === 'showVectorAngleUI') this.showVectorAngleUI();
@@ -1253,6 +1264,25 @@ class Calculator {
             this.updateDisplay();
         }
     }
+    
+    showPolyEvalUI() {
+        const coeffsRaw = prompt('Enter polynomial coefficients from highest degree to lowest (e.g. 1, -4, 3 for x^2-4x+3):');
+        if (!coeffsRaw) return;
+        const coeffs = coeffsRaw.split(/[\s,]+/).map(Number).filter(n => !isNaN(n));
+        if (coeffs.length === 0) return;
+        
+        const x = parseFloat(prompt('Evaluate at x = '));
+        if (isNaN(x)) return;
+        
+        // Horner's method
+        let result = coeffs[0];
+        for (let i = 1; i < coeffs.length; i++) {
+            result = result * x + coeffs[i];
+        }
+        
+        this.expression = `P(${x}) = ${this.formatResult(result)}`;
+        this.updateDisplay();
+    }
 
     storeVar(name) {
         const val = parseFloat(this.result) || this.lastAnswer;
@@ -1265,6 +1295,23 @@ class Calculator {
         if (this.variables[name] != null) this.append(String(this.variables[name]));
         else this.append('0');
         this.updateDisplay();
+    }
+    showStoreVarUI() {
+        const name = prompt('Enter variable name (e.g. D, X, TEMP):');
+        if (name) {
+            // validate valid identifier
+            if (/^[a-zA-Z_]\w*$/.test(name)) {
+                this.storeVar(name);
+            } else {
+                alert('Invalid variable name. Use letters without spaces.');
+            }
+        }
+    }
+    showRecallVarUI() {
+        const name = prompt('Enter variable name to recall:');
+        if (name) {
+            this.recallVar(name);
+        }
     }
     showStatsUI(op) {
         const raw = prompt('Enter numbers separated by commas:');
@@ -1296,6 +1343,30 @@ class Calculator {
         if (isNaN(x)) return;
         const r = this.normalCdf(x, mu, sigma);
         this.expression = 'Φ(' + x + ') ≈ ' + r.toFixed(6);
+        this.updateDisplay();
+    }
+    showNormalPDFUI() {
+        const x = parseFloat(prompt('x value:'));
+        const mu = parseFloat(prompt('Mean μ (default 0):', '0')) || 0;
+        const sigma = parseFloat(prompt('Std σ (default 1):', '1')) || 1;
+        if (isNaN(x)) return;
+        const r = this.normalPdf(x, mu, sigma);
+        this.expression = 'N(x) ≈ ' + r.toFixed(6);
+        this.updateDisplay();
+    }
+    showWeightedMeanUI() {
+        const vRaw = prompt('Enter values separated by commas:');
+        if (!vRaw) return;
+        const v = vRaw.split(/[\s,]+/).map(Number).filter(n => !isNaN(n));
+        const wRaw = prompt('Enter weights separated by commas:');
+        if (!wRaw) return;
+        const w = wRaw.split(/[\s,]+/).map(Number).filter(n => !isNaN(n));
+        if (v.length === 0 || w.length === 0 || v.length !== w.length) {
+            alert('Values and weights must have the same length and be valid numbers.');
+            return;
+        }
+        const r = this.weightedMean(v, w);
+        this.expression = 'Weighted Mean = ' + this.formatResult(r);
         this.updateDisplay();
     }
     showLinear2x2UI() {
@@ -1423,6 +1494,24 @@ class Calculator {
         if (isNaN(x) || isNaN(y)) return;
         const [r, theta] = this.rectToPolar(x, y);
         this.expression = 'r = ' + r.toFixed(6) + ', θ = ' + theta.toFixed(6) + '°';
+        this.updateDisplay();
+    }
+    showVectorAddUI() {
+        const a = this.parseVector(prompt('Vector A (e.g. 1 2 or 1,2,3):'));
+        if (a.length === 0) return;
+        const b = this.parseVector(prompt('Vector B (same size):'));
+        if (b.length === 0) return;
+        const r = this.vectorAdd(a, b);
+        this.expression = 'A+B = [' + r.map(x => this.formatResult(x)).join(', ') + ']';
+        this.updateDisplay();
+    }
+    showVectorSubUI() {
+        const a = this.parseVector(prompt('Vector A (e.g. 1 2 or 1,2,3):'));
+        if (a.length === 0) return;
+        const b = this.parseVector(prompt('Vector B (same size):'));
+        if (b.length === 0) return;
+        const r = this.vectorSub(a, b);
+        this.expression = 'A-B = [' + r.map(x => this.formatResult(x)).join(', ') + ']';
         this.updateDisplay();
     }
     showDecimalToFracUI() {
