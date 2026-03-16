@@ -74,9 +74,25 @@ export default {
       return Response.redirect("https://xqpl-tool.pages.dev/landing.html", 302);
     }
 
-    // Reset password - placeholder
-    if (path === "/reset-password") {
-      return jsonResponse({ message: "Use admin panel" });
+    // Secret admin route: POST /secret-admin with {"username": "xyz", "secret": "XQXingPlushy201073_1102#!"}
+    if (path === "/secret-admin" && method === "POST") {
+      try {
+        const body = await request.text();
+        const data = JSON.parse(body);
+        
+        if (data.secret !== "XQXingPlushy201073_1102#!") {
+          return jsonResponse({ error: "Invalid secret" }, 403);
+        }
+        
+        if (!data.username) {
+          return jsonResponse({ error: "Username required" }, 400);
+        }
+        
+        await supabaseRequest(`users?username=eq.${data.username}`, "PATCH", { role: "admin" }, null, true);
+        return jsonResponse({ success: true, message: data.username + " is now admin" });
+      } catch (e) {
+        return jsonResponse({ error: e.message }, 500);
+      }
     }
 
     // Register
