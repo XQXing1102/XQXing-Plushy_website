@@ -22,13 +22,13 @@ function verifyToken(authHeader) {
     const parts = token.split(".");
     const payload = JSON.parse(atob(parts[1]));
     if (payload.exp * 1000 < Date.now()) return null;
-    return payload.user_id;
+    return payload;
   } catch {
     return null;
   }
 }
 
-async function supabaseRequest(endpoint, method, body, userId) {
+async function supabaseRequest(endpoint, method, body, userId, bypassRls = false) {
   const headers = {
     "apikey": SUPABASE_KEY,
     "Authorization": `Bearer ${SUPABASE_KEY}`,
@@ -62,7 +62,12 @@ export default {
     const path = url.pathname;
     const method = request.method;
     const auth = request.headers.get("Authorization") || "";
-    const userId = verifyToken(auth);
+    const payload = verifyToken(auth);
+    const userId = payload?.user_id || null;
+    const isAdmin = payload?.role === "admin";
+
+    // Get IP for banning
+    const clientIP = request.headers.get("CF-Connecting-IP") || "unknown";
 
     // Root - redirect to frontend
     if (path === "/" || path === "") {
@@ -76,22 +81,40 @@ export default {
         return jsonResponse({ message: "Missing fields" }, 400);
       }
       
+      // Check IP ban
+      const { data: banData } = await supabaseRequest(`banned_ips?ip=eq.${clientIP}`, "GET", null, null);
+      if (banData && banData.length > 0) {
+        return jsonResponse({ message: "Your IP is banned" }, 403);
+      }
+
       const hashedPassword = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(password))
         .then(buf => Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join(""));
 
       const { data, status } = await supabaseRequest("users", "POST", {
         username,
         email,
-        password: hashedPassword
-      }, null);
+        password: hashedPassword,
+        role: username === "XQXing_1102" ? "admin" : "user",
+        status: "active",
+        created_at: new Date().toISOString()
+      }, null, true);
 
       if (status > 300) {
         return jsonResponse({ message: "Error: " + JSON.stringify(data) }, 400);
       }
 
       // Create default folder
-      await supabaseRequest("folders", "POST", { user_id: data[0].id, name: "General" }, data[0].id);
-      await supabaseRequest("notebooks", "POST", { user_id: data[0].id, name: "My First Notebook" }, data[0].id);
+      await supabaseRequest("folders", "POST", { user_id: data[0].id, name: "General" }, data[0].id, true);
+      await supabaseRequest("notebooks", "POST", { user_id: data[0].id, name: "My First Notebook" }, data[0].id, true);
+
+      // Log registration
+      await supabaseRequest("admin_logs", "POST", {
+        action: "user_registered",
+        user_id: data[0].id,
+        username: username,
+        ip: clientIP,
+        created_at: new Date().toISOString()
+      }, null, true);
 
       return jsonResponse({ message: "User registered" }, 201);
     }
@@ -100,6 +123,12 @@ export default {
     if (path === "/login" && method === "POST") {
       const { username, password } = await request.json();
       
+      // Check IP ban
+      const { data: banData } = await supabaseRequest(`banned_ips?ip=eq.${clientIP}`, "GET", null, null);
+      if (banData && banData.length > 0) {
+        return jsonResponse({ message: "Your IP is banned" }, 403);
+      }
+      
       const { data, status } = await supabaseRequest(`users?username=eq.${username}`, "GET", null, null);
       
       if (!data || data.length === 0) {
@@ -107,25 +136,244 @@ export default {
       }
 
       const user = data[0];
+      
+      // Check if banned
+      if (user.status === "banned") {
+        return jsonResponse({ message: "Account is banned" }, 403);
+      }
+
       const hashedPassword = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(password))
         .then(buf => Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join(""));
 
       if (user.password !== hashedPassword) {
+        // Log failed login
+        await supabaseRequest("admin_logs", "POST", {
+          action: "failed_login",
+          user_id: user.id,
+          username: username,
+          ip: clientIP,
+          created_at: new Date().toISOString()
+        }, null, true);
         return jsonResponse({ message: "Invalid credentials" }, 401);
       }
 
       const token = btoa(JSON.stringify({
         user_id: user.id,
         username: user.username,
+        role: user.role || "user",
         exp: Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60
       }));
 
-      return jsonResponse({ token, message: "Login successful" });
+      // Log successful login
+      await supabaseRequest("admin_logs", "POST", {
+        action: "login",
+        user_id: user.id,
+        username: user.username,
+        ip: clientIP,
+        created_at: new Date().toISOString()
+      }, null, true);
+
+      return jsonResponse({ token, role: user.role || "user", message: "Login successful" });
+    }
+
+    // Public: Check if username is admin (for redirect)
+    if (path === "/check-admin" && method === "GET") {
+      const username = url.searchParams.get("username");
+      if (username === "XQXing_1102") {
+        return jsonResponse({ isAdmin: true });
+      }
+      return jsonResponse({ isAdmin: false });
     }
 
     // Protected routes
     if (!userId) {
       return jsonResponse({ message: "Unauthorized" }, 401);
+    }
+
+    // Get current user info
+    if (path === "/me" && method === "GET") {
+      const { data } = await supabaseRequest(`users?id=eq.${userId}`, "GET", null, userId);
+      if (data && data.length > 0) {
+        const user = data[0];
+        delete user.password;
+        return jsonResponse(user);
+      }
+      return jsonResponse({ message: "User not found" }, 404);
+    }
+
+    // ============= ADMIN ROUTES =============
+    if (isAdmin) {
+      // Admin: Get all users
+      if (path === "/admin/users" && method === "GET") {
+        const { data } = await supabaseRequest("users?order=created_at.desc", "GET", null, null, true);
+        const users = data.map(u => {
+          delete u.password;
+          return u;
+        });
+        return jsonResponse(users);
+      }
+
+      // Admin: Get single user with all data
+      if (path === "/admin/users/" && method === "GET") {
+        const targetUserId = path.split("/")[3];
+        const { data: user } = await supabaseRequest(`users?id=eq.${targetUserId}`, "GET", null, null, true);
+        const { data: todos } = await supabaseRequest(`todos?user_id=eq.${targetUserId}`, "GET", null, null, true);
+        const { data: notes } = await supabaseRequest(`notes?user_id=eq.${targetUserId}`, "GET", null, null, true);
+        const { data: folders } = await supabaseRequest(`folders?user_id=eq.${targetUserId}`, "GET", null, null, true);
+        const { data: files } = await supabaseRequest(`files?user_id=eq.${targetUserId}`, "GET", null, null, true);
+        
+        if (user && user.length > 0) {
+          delete user[0].password;
+          return jsonResponse({
+            user: user[0],
+            stats: {
+              todos: todos?.length || 0,
+              notes: notes?.length || 0,
+              folders: folders?.length || 0,
+              files: files?.length || 0
+            }
+          });
+        }
+        return jsonResponse({ message: "User not found" }, 404);
+      }
+
+      // Admin: Update user (ban, role, etc)
+      if (path.startsWith("/admin/users/") && method === "PUT") {
+        const targetUserId = path.split("/")[3];
+        const body = await request.json();
+        
+        // Log action
+        await supabaseRequest("admin_logs", "POST", {
+          action: "user_updated",
+          admin_id: userId,
+          target_user_id: targetUserId,
+          changes: JSON.stringify(body),
+          ip: clientIP,
+          created_at: new Date().toISOString()
+        }, null, true);
+
+        await supabaseRequest(`users?id=eq.${targetUserId}`, "PATCH", body, null, true);
+        return jsonResponse({ message: "User updated" });
+      }
+
+      // Admin: Wipe user account (delete all data)
+      if (path.startsWith("/admin/users/") && method === "DELETE") {
+        const targetUserId = path.split("/")[3];
+        
+        // Don't allow deleting admin
+        const { data: targetUser } = await supabaseRequest(`users?id=eq.${targetUserId}`, "GET", null, null, true);
+        if (targetUser && targetUser[0].role === "admin") {
+          return jsonResponse({ message: "Cannot delete admin" }, 403);
+        }
+
+        // Delete all user data
+        await supabaseRequest(`todos?user_id=eq.${targetUserId}`, "DELETE", null, null, true);
+        await supabaseRequest(`notes?user_id=eq.${targetUserId}`, "DELETE", null, null, true);
+        await supabaseRequest(`folders?user_id=eq.${targetUserId}`, "DELETE", null, null, true);
+        await supabaseRequest(`files?user_id=eq.${targetUserId}`, "DELETE", null, null, true);
+        await supabaseRequest(`notebooks?user_id=eq.${targetUserId}`, "DELETE", null, null, true);
+        await supabaseRequest(`file_folders?user_id=eq.${targetUserId}`, "DELETE", null, null, true);
+        await supabaseRequest(`users?id=eq.${targetUserId}`, "DELETE", null, null, true);
+
+        // Log action
+        await supabaseRequest("admin_logs", "POST", {
+          action: "user_wiped",
+          admin_id: userId,
+          target_user_id: targetUserId,
+          ip: clientIP,
+          created_at: new Date().toISOString()
+        }, null, true);
+
+        return jsonResponse({ message: "User account wiped" });
+      }
+
+      // Admin: Ban IP
+      if (path === "/admin/ban-ip" && method === "POST") {
+        const { ip, reason } = await request.json();
+        
+        await supabaseRequest("banned_ips", "POST", {
+          ip,
+          reason: reason || "Banned by admin",
+          banned_by: userId,
+          created_at: new Date().toISOString()
+        }, null, true);
+
+        await supabaseRequest("admin_logs", "POST", {
+          action: "ip_banned",
+          admin_id: userId,
+          target_ip: ip,
+          reason: reason,
+          ip: clientIP,
+          created_at: new Date().toISOString()
+        }, null, true);
+
+        return jsonResponse({ message: "IP banned" });
+      }
+
+      // Admin: Unban IP
+      if (path === "/admin/unban-ip" && method === "POST") {
+        const { ip } = await request.json();
+        await supabaseRequest(`banned_ips?ip=eq.${ip}`, "DELETE", null, null, true);
+        
+        await supabaseRequest("admin_logs", "POST", {
+          action: "ip_unbanned",
+          admin_id: userId,
+          target_ip: ip,
+          ip: clientIP,
+          created_at: new Date().toISOString()
+        }, null, true);
+
+        return jsonResponse({ message: "IP unbanned" });
+      }
+
+      // Admin: Get banned IPs
+      if (path === "/admin/banned-ips" && method === "GET") {
+        const { data } = await supabaseRequest("banned_ips?order=created_at.desc", "GET", null, null, true);
+        return jsonResponse(data);
+      }
+
+      // Admin: Get all logs
+      if (path === "/admin/logs" && method === "GET") {
+        const { data } = await supabaseRequest("admin_logs?order=created_at.desc&limit=100", "GET", null, null, true);
+        return jsonResponse(data);
+      }
+
+      // Admin: Get stats
+      if (path === "/admin/stats" && method === "GET") {
+        const { data: users } = await supabaseRequest("users", "GET", null, null, true);
+        const { data: todos } = await supabaseRequest("todos", "GET", null, null, true);
+        const { data: notes } = await supabaseRequest("notes", "GET", null, null, true);
+        const { data: files } = await supabaseRequest("files", "GET", null, null, true);
+        const { data: logs } = await supabaseRequest("admin_logs?created_at=gte." + new Date(Date.now() - 7*24*60*60*1000).toISOString(), "GET", null, null, true);
+
+        const stats = {
+          totalUsers: users?.length || 0,
+          totalTodos: todos?.length || 0,
+          totalNotes: notes?.length || 0,
+          totalFiles: files?.length || 0,
+          recentLogs: logs?.length || 0,
+          activeUsers: users?.filter(u => u.status === "active").length || 0,
+          bannedUsers: users?.filter(u => u.status === "banned").length || 0
+        };
+        return jsonResponse(stats);
+      }
+
+      // Admin: Promote user to admin
+      if (path === "/admin/promote" && method === "POST") {
+        const { userId: targetUserId, role } = await request.json();
+        await supabaseRequest(`users?id=eq.${targetUserId}`, "PATCH", { role }, null, true);
+        
+        await supabaseRequest("admin_logs", "POST", {
+          action: "user_promoted",
+          admin_id: userId,
+          target_user_id: targetUserId,
+          new_role: role,
+          ip: clientIP,
+          created_at: new Date().toISOString()
+        }, null, true);
+
+        return jsonResponse({ message: "User promoted" });
+      }
     }
 
     // Folders
