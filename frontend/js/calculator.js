@@ -798,7 +798,7 @@ class Calculator {
 
     // ===== MATRIX OPERATIONS =====
     matrixAdd(A, B) {
-        if (!A || !B || A.length === 0 || B.length === 0) return [];
+        if (!A || !B || A.length === 0 || B.length === 0 || !A[0] || !B[0]) return [];
         if (A.length !== B.length || A[0].length !== B[0].length) {
             alert('Matrices must have the same dimensions');
             return [];
@@ -807,7 +807,7 @@ class Calculator {
     }
 
     matrixMultiply(A, B) {
-        if (!A || !B || A.length === 0 || B.length === 0) return [];
+        if (!A || !B || A.length === 0 || B.length === 0 || !A[0] || !B[0]) return [];
         if (A[0].length !== B.length) {
             alert('Matrix dimensions incompatible for multiplication');
             return [];
@@ -827,9 +827,9 @@ class Calculator {
     }
 
     matrixDeterminant(A) {
-        if (!A || A.length === 0 || A[0].length === 0) return 0;
+        if (!A || A.length === 0 || !A[0] || A[0].length === 0) return 0;
         const n = A.length;
-        if (!A[0] || A[0].length !== n) {
+        if (A[0].length !== n) {
             alert('Matrix must be square');
             return 0;
         }
@@ -845,12 +845,12 @@ class Calculator {
     }
 
     matrixTranspose(A) {
-        if (!A || A.length === 0 || A[0].length === 0) return [];
+        if (!A || A.length === 0 || !A[0] || A[0].length === 0) return [];
         return A[0].map((_, i) => A.map(row => row[i] || 0));
     }
 
     matrixInverse(A) {
-        if (!A || A.length === 0) return null;
+        if (!A || A.length === 0 || !A[0]) return null;
         const n = A.length;
         if (n !== A[0].length) {
             alert('Matrix must be square');
@@ -874,7 +874,7 @@ class Calculator {
     }
 
     matrixSubtract(A, B) {
-        if (!A || !B || A.length === 0 || B.length === 0) return [];
+        if (!A || !B || A.length === 0 || B.length === 0 || !A[0] || !B[0]) return [];
         if (A.length !== B.length || A[0].length !== B[0].length) {
             alert('Matrices must have the same dimensions');
             return [];
