@@ -14,13 +14,29 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "*"}})
-app.config['SECRET_KEY'] = 'XQXing&piyushzu'
+CORS(app, resources={r"/*": {"origins": os.environ.get("CORS_ORIGINS", "*")}})
+app.config['SECRET_KEY'] = os.environ.get("SECRET_KEY", "dev-secret-key-change-in-production")
+app.config['DATABASE_PATH'] = os.path.join(os.path.dirname(__file__), "database.db")
 
 def get_db():
-    conn = sqlite3.connect("database.db")
+    db_path = app.config['DATABASE_PATH']
+    conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     return conn
+
+from contextlib import contextmanager
+
+@contextmanager
+def get_db_cursor():
+    conn = get_db()
+    try:
+        yield conn
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 def init_db():
     conn = get_db()

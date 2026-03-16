@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mind Map - XQXing-Plushy Tools</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/mindmap.css">
+  <link rel="stylesheet" href="css/_global-header.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <header class="global-header">
+    <div class="header-content">
+      <a href="index.html" class="logo">🧸 XQXing-Plushy</a>
+      <nav class="header-nav">
+        <a href="index.html" class="nav-link">Home</a>
+        <span id="nav-username" class="nav-user"></span>
+        <button onclick="logout()" class="nav-btn">Logout</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="mindmap-container">
+    <div class="mindmap-toolbar">
+      <h1>🗺️ Mind Map</h1>
+      <div class="toolbar-actions">
+        <button onclick="addCentralNode()" class="toolbar-btn primary">+ Add Central Node</button>
+        <button onclick="resetView()" class="toolbar-btn">Reset View</button>
+        <button onclick="clearMindMap()" class="toolbar-btn danger">Clear All</button>
+      </div>
+    </div>
+
+    <div id="mindmap-canvas" class="mindmap-canvas">
+      <svg id="connections-layer" class="connections-layer"></svg>
+      <div id="nodes-layer" class="nodes-layer"></div>
+    </div>
+
+    <div id="node-editor" class="node-editor hidden">
+      <h3>Edit Node</h3>
+      <input type="text" id="edit-node-text" placeholder="Node text..." maxlength="100">
+      <div class="editor-actions">
+        <button onclick="saveNodeEdit()" class="btn primary">Save</button>
+        <button onclick="cancelNodeEdit()" class="btn secondary">Cancel</button>
+      </div>
+    </div>
+
+    <div class="mindmap-help">
+      <p>💡 Double-click to add child node • Drag to move • Click to edit • Right-click to delete</p>
+    </div>
+  </main>
+
+  <script src="auth/auth.js"></script>
+  <script src="js/mindmap.js"></script>
+</body>
+</html>

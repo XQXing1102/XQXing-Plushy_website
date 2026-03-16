@@ -46,11 +46,123 @@
     <a href="notes.html" class="tool-tile">
       <div class="tile-core"><span>📓 Smart Notes</span></div>
     </a>
+    <button class="tool-tile" onclick="openMindMap()">
+      <div class="tile-core"><span>🗺️ Mind Map</span></div>
+    </button>
   </main>
+
+  <div id="mindmap-modal" class="modal-overlay hidden">
+    <div class="modal-content mindmap-modal-full">
+      <div class="mm-sidebar">
+        <div class="mm-sidebar-header">
+          <h3>Folders</h3>
+          <button onclick="createFolder()" class="mm-sidebar-btn" title="New Folder">➕</button>
+        </div>
+        <div id="folder-list" class="mm-folder-list"></div>
+        <div class="mm-sidebar-header" style="margin-top: 20px;">
+          <h3>Mind Maps</h3>
+          <button onclick="createMindmap()" class="mm-sidebar-btn" title="New Mind Map">➕</button>
+        </div>
+        <div id="mindmap-list" class="mm-mindmap-list"></div>
+      </div>
+      <div class="mm-main">
+        <div class="modal-header">
+          <div class="mm-header-left">
+            <button class="mm-header-btn" onclick="renameMindMap()" title="Rename">✏️</button>
+            <span id="mindmap-name-display">My Mind Map</span>
+          </div>
+          <div class="mm-header-actions">
+            <button class="mm-export-btn" onclick="exportToImage()">📷 PNG</button>
+            <button class="mm-export-btn" onclick="exportToPDF()">📄 PDF</button>
+            <button class="modal-close" onclick="closeMindMap()">✕</button>
+          </div>
+        </div>
+        <div class="mindmap-toolbar-inline">
+          <button onclick="addCentralNode()" class="mm-btn primary">+ Add Central Node</button>
+          <button onclick="resetView()" class="mm-btn">Reset View</button>
+          <button onclick="clearMindMap()" class="mm-btn danger">Clear All</button>
+        </div>
+        <div id="mindmap-canvas" class="mm-canvas">
+          <svg id="mm-connections" class="mm-connections"></svg>
+          <div id="mm-nodes" class="mm-nodes"></div>
+        </div>
+        
+        <div id="branch-menu" class="mm-branch-menu">
+          <div class="branch-menu-title">Add Branch</div>
+          <div class="branch-options">
+            <button class="branch-btn" onclick="addBranch('left')">⬅️ Left</button>
+            <button class="branch-btn" onclick="addBranch('right')">➡️ Right</button>
+            <button class="branch-btn" onclick="addBranch('top')">⬆️ Top</button>
+            <button class="branch-btn" onclick="addBranch('bottom')">⬇️ Bottom</button>
+            <button class="branch-btn" onclick="addBranch('auto')">✨ Auto</button>
+          </div>
+        </div>
+        
+        <div id="style-editor" class="mm-style-editor">
+          <div class="style-editor-title">Node Style</div>
+          <div class="style-form">
+            <div class="style-row">
+              <label>Shape:</label>
+              <select id="shape-select">
+                <option value="rounded">Rounded</option>
+                <option value="square">Square</option>
+                <option value="pill">Pill</option>
+                <option value="circle">Circle</option>
+                <option value="diamond">Diamond</option>
+                <option value="hexagon">Hexagon</option>
+              </select>
+            </div>
+            <div class="style-row">
+              <label>Background:</label>
+              <input type="color" id="bg-color" value="#6366f1">
+            </div>
+            <div class="style-row">
+              <label>Text Color:</label>
+              <input type="color" id="text-color" value="#ffffff">
+            </div>
+            <div class="style-row">
+              <label>Font Size:</label>
+              <input type="number" id="font-size" min="10" max="32" value="14">
+            </div>
+            <div class="style-row">
+              <label>Font:</label>
+              <select id="font-family">
+                <option value="Inter, sans-serif">Inter</option>
+                <option value="Arial, sans-serif">Arial</option>
+                <option value="Georgia, serif">Georgia</option>
+                <option value="Courier New, monospace">Courier</option>
+                <option value="Times New Roman, serif">Times</option>
+              </select>
+            </div>
+            <div class="style-actions">
+              <button onclick="saveStyle()" class="mm-btn primary">Apply</button>
+              <button onclick="deleteNode(selectedNodeId)" class="mm-btn danger">Delete</button>
+              <button onclick="hideStyleEditor()" class="mm-btn">Cancel</button>
+            </div>
+          </div>
+        </div>
+        
+        <div class="mm-editor" id="mm-editor">
+          <input type="text" id="mm-edit-input" placeholder="Node text..." maxlength="100">
+          <div class="mm-editor-actions">
+            <button onclick="saveNodeEdit()" class="mm-btn primary">Save</button>
+            <button onclick="cancelNodeEdit()" class="mm-btn">Cancel</button>
+            <button onclick="openStyleEditor(editingNodeId)" class="mm-btn">🎨</button>
+            <button onclick="addBranchMenu(editingNodeId, {clientX: event.clientX, clientY: event.clientY})" class="mm-btn">➕</button>
+          </div>
+        </div>
+        
+        <div class="mm-help">
+          💡 Double-click to add child • Drag to move • Click to edit • Ctrl+Click for style • Right-click to delete • Auto-saves
+        </div>
+      </div>
+    </div>
+  </div>
 
 </div>
 
 <script src="js/main.js"></script>
+<script src="js/mindmap.js"></script>
 <script src="auth/auth.js"></script>
 <script>
   if (!isLoggedIn()) {

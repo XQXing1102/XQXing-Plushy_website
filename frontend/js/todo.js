@@ -1,6 +1,14 @@
 const TODO_API = "http://127.0.0.1:9999/todos";
 const FOLDERS_API = "http://127.0.0.1:9999/folders";
 
+// ===== HTML ESCAPE TO PREVENT XSS =====
+function escapeHtml(text) {
+  if (!text) return "";
+  const div = document.createElement("div");
+  div.textContent = text;
+  return div.innerHTML;
+}
+
 // ===== TOAST NOTIFICATIONS =====
 function showToast(type, message) {
   const container = document.getElementById("toastContainer");
@@ -89,10 +97,10 @@ async function fetchTodos(folderId = null) {
 
       li.innerHTML = `
               <div>
-                <b>${todo.title}</b> 
-                <span class="${priorityClass}">(${todo.priority})</span>
+                <b>${escapeHtml(todo.title)}</b> 
+                <span class="${priorityClass}">(${escapeHtml(todo.priority)})</span>
                 <br>
-                <small>Due: ${todo.due_date || "No date"} @ ${formatTimeDisplay(todo.due_time || "23:59")}</small>
+                <small>Due: ${escapeHtml(todo.due_date || "No date")} @ ${formatTimeDisplay(todo.due_time || "23:59")}</small>
               </div>
 
               <div class="todo-actions">
@@ -104,10 +112,10 @@ async function fetchTodos(folderId = null) {
 
       // Store task data in data attributes for editing
       li.setAttribute("data-todo-id", todo.id);
-      li.setAttribute("data-todo-title", todo.title);
-      li.setAttribute("data-todo-priority", todo.priority);
-      li.setAttribute("data-todo-date", todo.due_date || "");
-      li.setAttribute("data-todo-time", todo.due_time || "23:59");
+      li.setAttribute("data-todo-title", escapeHtml(todo.title));
+      li.setAttribute("data-todo-priority", escapeHtml(todo.priority));
+      li.setAttribute("data-todo-date", escapeHtml(todo.due_date || ""));
+      li.setAttribute("data-todo-time", escapeHtml(todo.due_time || "23:59"));
 
       if (todo.completed) li.style.opacity = "0.5";
 

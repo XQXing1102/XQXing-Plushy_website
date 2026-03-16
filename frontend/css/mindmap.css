@@ -1,0 +1,206 @@
+.mindmap-container {
+  min-height: calc(100vh - 60px);
+  padding: 20px;
+  background: #0f0f0f;
+}
+
+.mindmap-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding: 15px 20px;
+  background: #1a1a1a;
+  border-radius: 12px;
+  border: 1px solid #2a2a2a;
+}
+
+.mindmap-toolbar h1 {
+  margin: 0;
+  font-size: 1.5rem;
+  color: #fff;
+}
+
+.toolbar-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.toolbar-btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: #2a2a2a;
+  color: #fff;
+}
+
+.toolbar-btn:hover {
+  background: #3a3a3a;
+}
+
+.toolbar-btn.primary {
+  background: #6366f1;
+}
+
+.toolbar-btn.primary:hover {
+  background: #818cf8;
+}
+
+.toolbar-btn.danger {
+  background: #ef4444;
+}
+
+.toolbar-btn.danger:hover {
+  background: #f87171;
+}
+
+.mindmap-canvas {
+  position: relative;
+  width: 100%;
+  height: calc(100vh - 200px);
+  background: #1a1a1a;
+  border-radius: 12px;
+  border: 1px solid #2a2a2a;
+  overflow: hidden;
+  cursor: grab;
+}
+
+.mindmap-canvas:active {
+  cursor: grabbing;
+}
+
+.connections-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.connection-line {
+  stroke: #6366f1;
+  stroke-width: 2;
+  opacity: 0.6;
+}
+
+.nodes-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.mindmap-node {
+  position: absolute;
+  padding: 12px 24px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #fff;
+  border-radius: 25px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: move;
+  user-select: none;
+  white-space: nowrap;
+  box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
+  transition: transform 0.1s ease, box-shadow 0.2s ease;
+}
+
+.mindmap-node:hover {
+  box-shadow: 0 6px 25px rgba(99, 102, 241, 0.5);
+  transform: scale(1.02);
+}
+
+.mindmap-node.central {
+  background: linear-gradient(135deg, #f59e0b, #ef4444);
+  font-size: 1rem;
+  padding: 15px 30px;
+  box-shadow: 0 4px 20px rgba(245, 158, 11, 0.4);
+}
+
+.node-editor {
+  position: fixed;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1a1a1a;
+  padding: 20px;
+  border-radius: 12px;
+  border: 1px solid #2a2a2a;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+  z-index: 100;
+  min-width: 300px;
+}
+
+.node-editor.hidden {
+  display: none;
+}
+
+.node-editor h3 {
+  margin: 0 0 15px 0;
+  color: #fff;
+  font-size: 1rem;
+}
+
+.node-editor input {
+  width: 100%;
+  padding: 12px 15px;
+  border: 1px solid #3a3a3a;
+  border-radius: 8px;
+  background: #0f0f0f;
+  color: #fff;
+  font-size: 0.95rem;
+  box-sizing: border-box;
+}
+
+.node-editor input:focus {
+  outline: none;
+  border-color: #6366f1;
+}
+
+.editor-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.editor-actions .btn {
+  flex: 1;
+  padding: 10px;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.editor-actions .btn.primary {
+  background: #6366f1;
+  color: #fff;
+}
+
+.editor-actions .btn.primary:hover {
+  background: #818cf8;
+}
+
+.editor-actions .btn.secondary {
+  background: #3a3a3a;
+  color: #fff;
+}
+
+.editor-actions .btn.secondary:hover {
+  background: #4a4a4a;
+}
+
+.mindmap-help {
+  margin-top: 15px;
+  text-align: center;
+  color: #666;
+  font-size: 0.85rem;
+}

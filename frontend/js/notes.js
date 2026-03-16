@@ -2,6 +2,14 @@
 const API_URL = 'http://localhost:9999';
 const token = localStorage.getItem('token');
 
+// ===== HTML ESCAPE TO PREVENT XSS =====
+function escapeHtml(text) {
+  if (!text) return "";
+  const div = document.createElement("div");
+  div.textContent = text;
+  return div.innerHTML;
+}
+
 // Global state
 let notebooks = [];
 let currentNotebookId = null;
@@ -194,7 +202,7 @@ function renderNotesList() {
             const el = document.createElement('div');
             el.className = `note-item ${note.id === currentNoteId ? 'active' : ''}`;
             el.innerHTML = `
-                <div class="note-title-display">${note.title || 'Untitled'}</div>
+                <div class="note-title-display">${escapeHtml(note.title || 'Untitled')}</div>
                 <div class="note-section-display">Updated: ${new Date(note.updated_at).toLocaleDateString()}</div>
             `;
             el.addEventListener('click', () => selectNote(note.id));
