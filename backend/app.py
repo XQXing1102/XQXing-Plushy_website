@@ -1,135 +1,577 @@
+import os
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
-import sqlite3
 import jwt
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
-import os
 import smtplib
 
-# Load .env from backend folder so SMTP_* variables are available
 from dotenv import load_dotenv
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from supabase import create_client, Client
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": os.environ.get("CORS_ORIGINS", "*")}})
 app.config['SECRET_KEY'] = os.environ.get("SECRET_KEY", "dev-secret-key-change-in-production")
-app.config['DATABASE_PATH'] = os.path.join(os.path.dirname(__file__), "database.db")
 
-def get_db():
-    db_path = app.config['DATABASE_PATH']
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
-    return conn
+# Supabase client
+def get_supabase() -> Client:
+    url = os.environ.get("SUPABASE_URL")
+    key = os.environ.get("SUPABASE_KEY")
+    return create_client(url, key)
 
-from contextlib import contextmanager
+supabase = get_supabase()
 
-@contextmanager
-def get_db_cursor():
-    conn = get_db()
+# ===== HELPER FUNCTIONS =====
+def verify_token(token):
     try:
-        yield conn
-        conn.commit()
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
+        payload = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
+        return payload['user_id']
+    except jwt.ExpiredSignatureError:
+        return None
+    except jwt.InvalidTokenError:
+        return None
 
-def init_db():
-    conn = get_db()
-    conn.execute("""
-    CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        username TEXT UNIQUE NOT NULL,
-        email TEXT UNIQUE NOT NULL,
-        password TEXT NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
-    """)
-    conn.execute("""
-    CREATE TABLE IF NOT EXISTS folders (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
-        name TEXT NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (user_id) REFERENCES users(id)
-    )
-    """)
-    conn.execute("""
-    CREATE TABLE IF NOT EXISTS todos (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
-        folder_id INTEGER,
-        title TEXT,
-        priority TEXT,
-        due_date TEXT,
-        due_time TEXT DEFAULT '23:59',
-        completed INTEGER DEFAULT 0,
-        reminder_sent INTEGER DEFAULT 0,
-        FOREIGN KEY (user_id) REFERENCES users(id),
-        FOREIGN KEY (folder_id) REFERENCES folders(id)
-    )
-    """)
+def get_user_by_username(username):
+    response = supabase.table("users").select("*").eq("username", username).execute()
+    return response.data[0] if response.data else None
+
+def get_user_by_id(user_id):
+    response = supabase.table("users").select("*").eq("id", user_id).execute()
+    return response.data[0] if response.data else None
+
+def create_user(username, email, password):
+    hashed_password = generate_password_hash(password)
+    response = supabase.table("users").insert({
+        "username": username,
+        "email": email,
+        "password": hashed_password
+    }).execute()
+    return response.data[0] if response.data else None
+
+# Serve landing page
+@app.route("/", methods=["GET"])
+def home():
+    return send_from_directory(os.path.join(os.path.dirname(__file__), '..', 'frontend'), 'landing.html')
+
+# Register endpoint
+@app.route("/register", methods=["POST"])
+def register():
+    data = request.json
+    username = (data.get("username") or "").strip()
+    email = (data.get("email") or "").strip()
+    password = data.get("password")
+
+    if not username:
+        return jsonify({"message": "Username required"}), 400
+    if not email:
+        return jsonify({"message": "Email required"}), 400
+    if "@" not in email:
+        return jsonify({"message": "Enter a valid email address"}), 400
+    if not password:
+        return jsonify({"message": "Password required"}), 400
+
+    try:
+        user = create_user(username, email, password)
+        if not user:
+            return jsonify({"message": "Username or email already exists"}), 400
+        
+        # Create default folder
+        supabase.table("folders").insert({"user_id": user["id"], "name": "General"}).execute()
+        
+        return jsonify({"message": "User registered successfully"}), 201
+    except Exception as e:
+        if "duplicate" in str(e).lower():
+            return jsonify({"message": "Username or email already exists"}), 400
+        return jsonify({"message": str(e)}), 500
+
+# Login endpoint
+@app.route("/login", methods=["POST"])
+def login():
+    data = request.json
+    username = data.get("username")
+    password = data.get("password")
+
+    if not username or not password:
+        return jsonify({"message": "Missing username or password"}), 400
+
+    user = get_user_by_username(username)
+
+    if user and check_password_hash(user["password"], password):
+        token = jwt.encode(
+            {
+                "user_id": user["id"],
+                "username": user["username"],
+                "exp": datetime.utcnow() + timedelta(days=7)
+            },
+            app.config['SECRET_KEY'],
+            algorithm='HS256'
+        )
+        return jsonify({"token": token, "message": "Login successful"}), 200
+    else:
+        return jsonify({"message": "Invalid username or password"}), 401
+
+# ===== FOLDERS =====
+@app.route("/folders", methods=["GET"])
+def get_folders():
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    user_id = verify_token(token)
+    if not user_id:
+        return jsonify({"message": "Unauthorized"}), 401
+
+    response = supabase.table("folders").select("*").eq("user_id", user_id).order("created_at", desc=True).execute()
+    folders = response.data
     
-    # Add folder_id column if it doesn't exist
-    try:
-        conn.execute("ALTER TABLE todos ADD COLUMN folder_id INTEGER")
-        conn.commit()
-    except:
-        pass  # Column already exists
-
-    # Notes features
-    conn.execute("""
-    CREATE TABLE IF NOT EXISTS notebooks (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
-        name TEXT NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (user_id) REFERENCES users(id)
-    )
-    """)
-    conn.execute("""
-    CREATE TABLE IF NOT EXISTS notes (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
-        notebook_id INTEGER NOT NULL,
-        section TEXT NOT NULL DEFAULT 'General',
-        title TEXT NOT NULL,
-        content TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (user_id) REFERENCES users(id),
-        FOREIGN KEY (notebook_id) REFERENCES notebooks(id)
-    )
-    """)
-
-    # Add due_time column if it doesn't exist (for existing databases)
-    try:
-        conn.execute("ALTER TABLE todos ADD COLUMN due_time TEXT DEFAULT '23:59'")
-        conn.commit()
-    except:
-        pass  # Column already exists
-
-    # Add reminder_sent column for email reminders (avoid duplicate emails)
-    try:
-        conn.execute("ALTER TABLE todos ADD COLUMN reminder_sent INTEGER DEFAULT 0")
-        conn.commit()
-    except:
-        pass  # Column already exists
+    if not folders:
+        supabase.table("folders").insert({"user_id": user_id, "name": "General"}).execute()
+        response = supabase.table("folders").select("*").eq("user_id", user_id).order("created_at", desc=True).execute()
+        folders = response.data
     
-    conn.commit()
-    conn.close()
+    return jsonify(folders)
 
-init_db()
+@app.route("/folders", methods=["POST"])
+def create_folder():
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    user_id = verify_token(token)
+    if not user_id:
+        return jsonify({"message": "Unauthorized"}), 401
+
+    data = request.json
+    name = data.get("name")
+    if not name:
+        return jsonify({"message": "Missing folder name"}), 400
+
+    response = supabase.table("folders").insert({"user_id": user_id, "name": name}).execute()
+    return jsonify({"message": "Folder created"}), 201
+
+@app.route("/folders/<int:id>", methods=["PUT"])
+def update_folder(id):
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    user_id = verify_token(token)
+    if not user_id:
+        return jsonify({"message": "Unauthorized"}), 401
+
+    data = request.json
+    name = data.get("name")
+    if not name:
+        return jsonify({"message": "Missing folder name"}), 400
+
+    supabase.table("folders").update({"name": name}).eq("id", id).eq("user_id", user_id).execute()
+    return jsonify({"message": "Folder updated"})
+
+@app.route("/folders/<int:id>", methods=["DELETE"])
+def delete_folder(id):
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    user_id = verify_token(token)
+    if not user_id:
+        return jsonify({"message": "Unauthorized"}), 401
+
+    supabase.table("todos").delete().eq("folder_id", id).eq("user_id", user_id).execute()
+    supabase.table("folders").delete().eq("id", id).eq("user_id", user_id).execute()
+    return jsonify({"message": "Folder deleted"})
+
+# ===== TODOS =====
+@app.route("/todos", methods=["GET"])
+def get_todos():
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    user_id = verify_token(token)
+    if not user_id:
+        return jsonify({"message": "Unauthorized"}), 401
+
+    folder_id = request.args.get("folder_id")
+    if folder_id:
+        response = supabase.table("todos").select("*").eq("user_id", user_id).eq("folder_id", folder_id).order("id", desc=True).execute()
+    else:
+        response = supabase.table("todos").select("*").eq("user_id", user_id).order("id", desc=True).execute()
+    
+    return jsonify(response.data)
+
+@app.route("/todos", methods=["POST"])
+def add_todo():
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    user_id = verify_token(token)
+    if not user_id:
+        return jsonify({"message": "Unauthorized"}), 401
+
+    data = request.json
+    if not data.get("title") or not data.get("priority"):
+        return jsonify({"message": "Missing title or priority"}), 400
+
+    response = supabase.table("todos").insert({
+        "user_id": user_id,
+        "folder_id": data.get("folder_id"),
+        "title": data["title"],
+        "priority": data["priority"],
+        "due_date": data.get("due_date", ""),
+        "due_time": data.get("due_time", "23:59")
+    }).execute()
+    
+    return jsonify({"message": "Task added"}), 201
+
+@app.route("/todos/<int:id>", methods=["PUT"])
+def update_todo(id):
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    user_id = verify_token(token)
+    if not user_id:
+        return jsonify({"message": "Unauthorized"}), 401
+
+    data = request.json
+    
+    # Get current todo
+    response = supabase.table("todos").select("*").eq("id", id).eq("user_id", user_id).execute()
+    if not response.data:
+        return jsonify({"message": "Todo not found"}), 404
+    
+    todo = response.data[0]
+    
+    title = data.get("title") if data.get("title") is not None else todo["title"]
+    priority = data.get("priority") if data.get("priority") is not None else todo["priority"]
+    due_date = data.get("due_date") if data.get("due_date") is not None else todo["due_date"]
+    due_time = data.get("due_time") if data.get("due_time") is not None else todo["due_time"]
+    completed = data.get("completed") if data.get("completed") is not None else todo["completed"]
+    
+    reset_reminder = (data.get("due_date") is not None and data.get("due_date") != todo["due_date"]) or (data.get("due_time") is not None and data.get("due_time") != todo["due_time"])
+    reminder_sent = 0 if reset_reminder else (todo.get("reminder_sent") or 0)
+
+    supabase.table("todos").update({
+        "title": title,
+        "priority": priority,
+        "due_date": due_date,
+        "due_time": due_time,
+        "completed": completed,
+        "reminder_sent": reminder_sent
+    }).eq("id", id).eq("user_id", user_id).execute()
+    
+    return jsonify({"message": "Updated"})
+
+@app.route("/todos/<int:id>", methods=["DELETE"])
+def delete_todo(id):
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    user_id = verify_token(token)
+    if not user_id:
+        return jsonify({"message": "Unauthorized"}), 401
+
+    supabase.table("todos").delete().eq("id", id).eq("user_id", user_id).execute()
+    return jsonify({"message": "Deleted"})
+
+# ===== NOTES & NOTEBOOKS =====
+@app.route("/notebooks", methods=["GET"])
+def get_notebooks():
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    user_id = verify_token(token)
+    if not user_id:
+        return jsonify({"message": "Unauthorized"}), 401
+
+    response = supabase.table("notebooks").select("*").eq("user_id", user_id).order("created_at", desc=True).execute()
+    notebooks = response.data
+    
+    if not notebooks:
+        supabase.table("notebooks").insert({"user_id": user_id, "name": "My First Notebook"}).execute()
+        response = supabase.table("notebooks").select("*").eq("user_id", user_id).order("created_at", desc=True).execute()
+        notebooks = response.data
+    
+    return jsonify(notebooks)
+
+@app.route("/notebooks", methods=["POST"])
+def create_notebook():
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    user_id = verify_token(token)
+    if not user_id:
+        return jsonify({"message": "Unauthorized"}), 401
+
+    data = request.json
+    name = data.get("name")
+    if not name:
+        return jsonify({"message": "Missing notebook name"}), 400
+
+    supabase.table("notebooks").insert({"user_id": user_id, "name": name}).execute()
+    return jsonify({"message": "Notebook created"}), 201
+
+@app.route("/notebooks/<int:id>", methods=["DELETE"])
+def delete_notebook(id):
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    user_id = verify_token(token)
+    if not user_id:
+        return jsonify({"message": "Unauthorized"}), 401
+
+    supabase.table("notes").delete().eq("notebook_id", id).eq("user_id", user_id).execute()
+    supabase.table("notebooks").delete().eq("id", id).eq("user_id", user_id).execute()
+    return jsonify({"message": "Notebook deleted"})
+
+@app.route("/notes", methods=["GET"])
+def get_notes():
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    user_id = verify_token(token)
+    if not user_id:
+        return jsonify({"message": "Unauthorized"}), 401
+
+    notebook_id = request.args.get("notebook_id")
+    if notebook_id:
+        response = supabase.table("notes").select("*").eq("user_id", user_id).eq("notebook_id", notebook_id).order("updated_at", desc=True).execute()
+    else:
+        response = supabase.table("notes").select("*").eq("user_id", user_id).order("updated_at", desc=True).execute()
+    
+    return jsonify(response.data)
+
+@app.route("/notes", methods=["POST"])
+def add_note():
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    user_id = verify_token(token)
+    if not user_id:
+        return jsonify({"message": "Unauthorized"}), 401
+
+    data = request.json
+    notebook_id = data.get("notebook_id")
+    title = data.get("title", "Untitled")
+    section = data.get("section", "General")
+    content = data.get("content", "")
+
+    if not notebook_id:
+        return jsonify({"message": "Missing notebook ID"}), 400
+
+    response = supabase.table("notes").insert({
+        "user_id": user_id,
+        "notebook_id": notebook_id,
+        "section": section,
+        "title": title,
+        "content": content
+    }).execute()
+    
+    return jsonify({"message": "Note added", "id": response.data[0]["id"] if response.data else None}), 201
+
+@app.route("/notes/<int:id>", methods=["GET"])
+def get_note(id):
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    user_id = verify_token(token)
+    if not user_id:
+        return jsonify({"message": "Unauthorized"}), 401
+
+    response = supabase.table("notes").select("*").eq("id", id).eq("user_id", user_id).execute()
+    if not response.data:
+        return jsonify({"message": "Note not found"}), 404
+    return jsonify(response.data[0])
+
+@app.route("/notes/<int:id>", methods=["PUT"])
+def update_note(id):
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    user_id = verify_token(token)
+    if not user_id:
+        return jsonify({"message": "Unauthorized"}), 401
+
+    data = request.json
+    
+    response = supabase.table("notes").select("*").eq("id", id).eq("user_id", user_id).execute()
+    if not response.data:
+        return jsonify({"message": "Note not found"}), 404
+    
+    note = response.data[0]
+    title = data.get("title") if data.get("title") is not None else note["title"]
+    section = data.get("section") if data.get("section") is not None else note["section"]
+    content = data.get("content") if data.get("content") is not None else note["content"]
+
+    supabase.table("notes").update({
+        "title": title,
+        "section": section,
+        "content": content,
+        "updated_at": datetime.utcnow().isoformat()
+    }).eq("id", id).eq("user_id", user_id).execute()
+    
+    return jsonify({"message": "Updated"})
+
+@app.route("/notes/<int:id>", methods=["DELETE"])
+def delete_note(id):
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    user_id = verify_token(token)
+    if not user_id:
+        return jsonify({"message": "Unauthorized"}), 401
+
+    supabase.table("notes").delete().eq("id", id).eq("user_id", user_id).execute()
+    return jsonify({"message": "Deleted"})
+
+# ===== FILES (Google Drive-like) =====
+@app.route("/files", methods=["GET"])
+def get_files():
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    user_id = verify_token(token)
+    if not user_id:
+        return jsonify({"message": "Unauthorized"}), 401
+
+    folder_id = request.args.get("folder_id")
+    file_type = request.args.get("type")
+    
+    query = supabase.table("files").select("*").eq("user_id", user_id)
+    
+    if folder_id:
+        query = query.eq("folder_id", folder_id)
+    if file_type:
+        query = query.eq("type", file_type)
+    
+    response = query.order("modified_at", desc=True).execute()
+    return jsonify(response.data)
+
+@app.route("/files", methods=["POST"])
+def upload_file():
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    user_id = verify_token(token)
+    if not user_id:
+        return jsonify({"message": "Unauthorized"}), 401
+
+    data = request.json
+    name = data.get("name")
+    file_type = data.get("type")
+    mime_type = data.get("mimeType")
+    size = data.get("size", 0)
+    file_data = data.get("data")
+    folder_id = data.get("folder_id")
+
+    if not name:
+        return jsonify({"message": "Missing file name"}), 400
+
+    response = supabase.table("files").insert({
+        "user_id": user_id,
+        "name": name,
+        "type": file_type,
+        "mime_type": mime_type,
+        "size": size,
+        "data": file_data,
+        "folder_id": folder_id
+    }).execute()
+    
+    return jsonify({"message": "File uploaded", "id": response.data[0]["id"] if response.data else None}), 201
+
+@app.route("/files/<int:id>", methods=["GET"])
+def get_file(id):
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    user_id = verify_token(token)
+    if not user_id:
+        return jsonify({"message": "Unauthorized"}), 401
+
+    response = supabase.table("files").select("*").eq("id", id).eq("user_id", user_id).execute()
+    if not response.data:
+        return jsonify({"message": "File not found"}), 404
+    return jsonify(response.data[0])
+
+@app.route("/files/<int:id>", methods=["PUT"])
+def update_file(id):
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    user_id = verify_token(token)
+    if not user_id:
+        return jsonify({"message": "Unauthorized"}), 401
+
+    data = request.json
+    
+    response = supabase.table("files").select("*").eq("id", id).eq("user_id", user_id).execute()
+    if not response.data:
+        return jsonify({"message": "File not found"}), 404
+
+    name = data.get("name") if data.get("name") is not None else response.data[0]["name"]
+    folder_id = data.get("folder_id") if data.get("folder_id") is not None else response.data[0]["folder_id"]
+
+    supabase.table("files").update({
+        "name": name,
+        "folder_id": folder_id,
+        "modified_at": datetime.utcnow().isoformat()
+    }).eq("id", id).eq("user_id", user_id).execute()
+    
+    return jsonify({"message": "Updated"})
+
+@app.route("/files/<int:id>", methods=["DELETE"])
+def delete_file(id):
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    user_id = verify_token(token)
+    if not user_id:
+        return jsonify({"message": "Unauthorized"}), 401
+
+    supabase.table("files").delete().eq("id", id).eq("user_id", user_id).execute()
+    return jsonify({"message": "Deleted"})
+
+# File Folders API
+@app.route("/file-folders", methods=["GET"])
+def get_file_folders():
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    user_id = verify_token(token)
+    if not user_id:
+        return jsonify({"message": "Unauthorized"}), 401
+
+    parent_id = request.args.get("parent_id")
+    
+    if parent_id:
+        response = supabase.table("file_folders").select("*").eq("user_id", user_id).eq("parent_id", parent_id).order("name").execute()
+    else:
+        response = supabase.table("file_folders").select("*").eq("user_id", user_id).order("name").execute()
+    
+    return jsonify(response.data)
+
+@app.route("/file-folders", methods=["POST"])
+def create_file_folder():
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    user_id = verify_token(token)
+    if not user_id:
+        return jsonify({"message": "Unauthorized"}), 401
+
+    data = request.json
+    name = data.get("name")
+    parent_id = data.get("parent_id")
+
+    if not name:
+        return jsonify({"message": "Missing folder name"}), 400
+
+    response = supabase.table("file_folders").insert({
+        "user_id": user_id,
+        "name": name,
+        "parent_id": parent_id
+    }).execute()
+    
+    return jsonify({"message": "Folder created", "id": response.data[0]["id"] if response.data else None}), 201
+
+@app.route("/file-folders/<int:id>", methods=["DELETE"])
+def delete_file_folder(id):
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    user_id = verify_token(token)
+    if not user_id:
+        return jsonify({"message": "Unauthorized"}), 401
+
+    # Get subfolders
+    response = supabase.table("file_folders").select("id").eq("parent_id", id).eq("user_id", user_id).execute()
+    for sub in response.data:
+        supabase.table("files").delete().eq("folder_id", sub["id"]).eq("user_id", user_id).execute()
+        supabase.table("file_folders").delete().eq("id", sub["id"]).eq("user_id", user_id).execute()
+    
+    supabase.table("files").delete().eq("folder_id", id).eq("user_id", user_id).execute()
+    supabase.table("file_folders").delete().eq("id", id).eq("user_id", user_id).execute()
+    return jsonify({"message": "Folder deleted"})
+
+# Import notes to files
+@app.route("/files/import-note/<int:note_id>", methods=["POST"])
+def import_note_to_files(note_id):
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    user_id = verify_token(token)
+    if not user_id:
+        return jsonify({"message": "Unauthorized"}), 401
+
+    response = supabase.table("notes").select("*").eq("id", note_id).eq("user_id", user_id).execute()
+    if not response.data:
+        return jsonify({"message": "Note not found"}), 404
+
+    note = response.data[0]
+    import base64
+    content = note["content"] or ""
+    encoded = base64.b64encode(content.encode()).decode()
+    
+    file_response = supabase.table("files").insert({
+        "user_id": user_id,
+        "name": f"{note['title']}.txt",
+        "type": "note",
+        "mime_type": "text/plain",
+        "size": len(content),
+        "data": encoded
+    }).execute()
+    
+    return jsonify({"message": "Note imported to files", "id": file_response.data[0]["id"] if file_response.data else None}), 201
 
 # ===== EMAIL REMINDER (SMTP) =====
-# Set these in environment (or .env with python-dotenv) when you have SMTP details:
-#   SMTP_HOST, SMTP_PORT (default 587), SMTP_USER, SMTP_PASSWORD,
-#   SMTP_FROM_EMAIL (optional, defaults to SMTP_USER), SMTP_USE_TLS (default 1).
-# Reminders are sent ~1 hour before each task's due date/time to the user's email.
 def get_smtp_config():
     try:
         port = int(os.environ.get("SMTP_PORT", "587"))
@@ -145,7 +587,6 @@ def get_smtp_config():
     }
 
 def send_reminder_email(to_email, task_title, due_datetime_str):
-    """Send a single reminder email. Returns True on success."""
     cfg = get_smtp_config()
     if not cfg["host"] or not cfg["user"] or not cfg["password"]:
         return False
@@ -167,520 +608,53 @@ def send_reminder_email(to_email, task_title, due_datetime_str):
         return False
 
 def check_and_send_reminders():
-    """Find tasks due within the next hour, send email to user, mark reminder_sent=1."""
     cfg = get_smtp_config()
     if not cfg["host"] or not cfg["user"]:
         return
     now = datetime.now()
     window_end = now + timedelta(hours=1)
-    conn = get_db()
-    sent_counts = [0]
-    try:
-        todos = conn.execute(
-            """SELECT t.id, t.user_id, t.title, t.due_date, t.due_time
-               FROM todos t
-               WHERE t.due_date IS NOT NULL AND t.due_date != ''
-                 AND t.completed = 0 AND (t.reminder_sent IS NULL OR t.reminder_sent = 0)"""
-        ).fetchall()
-        for row in todos:
-            due_date = (row["due_date"] or "").strip()
-            due_time = (row["due_time"] or "23:59").strip()
-            if len(due_time) == 5 and ":" in due_time:
-                pass
-            else:
-                due_time = "23:59"
-            if not due_date:
+    
+    response = supabase.table("todos").select("*").execute()
+    todos = [t for t in response.data if t.get("due_date") and not t.get("completed")]
+    
+    sent_count = 0
+    for row in todos:
+        due_date = (row.get("due_date") or "").strip()
+        due_time = (row.get("due_time") or "23:59").strip()
+        if len(due_time) == 5 and ":" in due_time:
+            pass
+        else:
+            due_time = "23:59"
+        if not due_date:
+            continue
+        try:
+            due_dt = datetime.strptime(f"{due_date} {due_time}", "%Y-%m-%d %H:%M")
+        except ValueError:
+            continue
+        if now <= due_dt <= window_end:
+            user = get_user_by_id(row["user_id"])
+            to_email = (user.get("email") or "").strip() if user else ""
+            if not user or not to_email:
                 continue
-            try:
-                due_dt = datetime.strptime(f"{due_date} {due_time}", "%Y-%m-%d %H:%M")
-            except ValueError as e:
-                print(f"[Reminder] Skip task id={row['id']}: invalid date/time '{due_date} {due_time}' -> {e}")
-                continue
-            if now <= due_dt <= window_end:
-                # Use the same email stored at registration (users.email)
-                user = conn.execute("SELECT username, email FROM users WHERE id=?", (row["user_id"],)).fetchone()
-                to_email = (user["email"] or "").strip() if user and "email" in user.keys() else ""
-                if not user or not to_email:
-                    print(f"[Reminder] Skip task id={row['id']} (user_id={row['user_id']}): no email for this user (use registered email).")
-                    continue
-                due_str = due_dt.strftime("%Y-%m-%d %H:%M")
-                print(f"[Reminder] Sending to {to_email} for task \"{row['title']}\" due {due_str}")
-                if send_reminder_email(to_email, row["title"], due_str):
-                    conn.execute("UPDATE todos SET reminder_sent=1 WHERE id=?", (row["id"],))
-                    conn.commit()
-                    sent_counts[0] += 1
-                    print(f"[Reminder] Sent OK for task id={row['id']}")
-                else:
-                    print(f"[Reminder] Failed to send for task id={row['id']}")
-        if sent_counts[0] or todos:
-            print(f"[Reminder] Check done: {len(todos)} candidate(s), {sent_counts[0]} email(s) sent. Now={now.strftime('%Y-%m-%d %H:%M')}, window_end={window_end.strftime('%Y-%m-%d %H:%M')}")
-    except Exception as e:
-        print(f"[Reminder] Error: {e}")
-    finally:
-        conn.close()
-
-# Serve landing page
-@app.route("/", methods=["GET"])
-def home():
-    return send_from_directory(os.path.join(os.path.dirname(__file__), '..', 'frontend'), 'landing.html')
-
-# Helper function to verify JWT token and get user_id
-def verify_token(token):
-    try:
-        payload = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
-        return payload['user_id']
-    except jwt.ExpiredSignatureError:
-        return None
-    except jwt.InvalidTokenError:
-        return None
-
-# Register endpoint – email is required and used for task reminder notifications
-@app.route("/register", methods=["POST"])
-def register():
-    data = request.json
-    username = (data.get("username") or "").strip()
-    email = (data.get("email") or "").strip()
-    password = data.get("password")
-
-    if not username:
-        return jsonify({"message": "Username required"}), 400
-    if not email:
-        return jsonify({"message": "Email required"}), 400
-    if "@" not in email:
-        return jsonify({"message": "Enter a valid email address"}), 400
-    if not password:
-        return jsonify({"message": "Password required"}), 400
-
-    try:
-        conn = get_db()
-        hashed_password = generate_password_hash(password)
-        cursor = conn.execute(
-            "INSERT INTO users (username, email, password) VALUES (?, ?, ?)",
-            (username, email, hashed_password)
-        )
-        conn.commit()
-        
-        # Get the newly created user_id
-        user_id = cursor.lastrowid
-        
-        # Create default "General" folder for new user
-        conn.execute(
-            "INSERT INTO folders (user_id, name) VALUES (?, ?)",
-            (user_id, "General")
-        )
-        conn.commit()
-        conn.close()
-        
-        return jsonify({"message": "User registered successfully"}), 201
-    except sqlite3.IntegrityError:
-        return jsonify({"message": "Username or email already exists"}), 400
-
-# Login endpoint
-@app.route("/login", methods=["POST"])
-def login():
-    data = request.json
-    username = data.get("username")
-    password = data.get("password")
-
-    if not username or not password:
-        return jsonify({"message": "Missing username or password"}), 400
-
-    conn = get_db()
-    user = conn.execute("SELECT * FROM users WHERE username=?", (username,)).fetchone()
-    conn.close()
-
-    if user and check_password_hash(user["password"], password):
-        token = jwt.encode(
-            {
-                "user_id": user["id"],
-                "username": user["username"],
-                "exp": datetime.utcnow() + timedelta(days=7)
-            },
-            app.config['SECRET_KEY'],
-            algorithm='HS256'
-        )
-        return jsonify({"token": token, "message": "Login successful"}), 200
-    else:
-        return jsonify({"message": "Invalid username or password"}), 401
-
-@app.route("/todos", methods=["GET"])
-def get_todos():
-    token = request.headers.get("Authorization", "").replace("Bearer ", "")
-    user_id = verify_token(token)
-
-    if not user_id:
-        return jsonify({"message": "Unauthorized"}), 401
-
-    folder_id = request.args.get("folder_id")
-    conn = get_db()
+            due_str = due_dt.strftime("%Y-%m-%d %H:%M")
+            if send_reminder_email(to_email, row["title"], due_str):
+                supabase.table("todos").update({"reminder_sent": 1}).eq("id", row["id"]).execute()
+                sent_count += 1
     
-    if folder_id:
-        todos = conn.execute(
-            "SELECT * FROM todos WHERE user_id=? AND folder_id=? ORDER BY id DESC", 
-            (user_id, folder_id)
-        ).fetchall()
-    else:
-        todos = conn.execute(
-            "SELECT * FROM todos WHERE user_id=? ORDER BY id DESC", 
-            (user_id,)
-        ).fetchall()
-    
-    conn.close()
-    return jsonify([dict(row) for row in todos])
+    print(f"[Reminder] Check done: {len(todos)} task(s) checked, {sent_count} email(s) sent")
 
-@app.route("/todos", methods=["POST"])
-def add_todo():
-    token = request.headers.get("Authorization", "").replace("Bearer ", "")
-    user_id = verify_token(token)
+@app.route("/check-reminders", methods=["GET", "POST"])
+def trigger_check_reminders():
+    check_and_send_reminders()
+    return jsonify({"message": "Reminder check completed"}), 200
 
-    if not user_id:
-        return jsonify({"message": "Unauthorized"}), 401
-
-    data = request.json
-    
-    # Validate required fields
-    if not data.get("title") or not data.get("priority"):
-        return jsonify({"message": "Missing title or priority"}), 400
-    
-    try:
-        conn = get_db()
-        conn.execute(
-            "INSERT INTO todos (user_id, folder_id, title, priority, due_date, due_time) VALUES (?, ?, ?, ?, ?, ?)",
-            (user_id, data.get("folder_id"), data["title"], data["priority"], data.get("due_date", ""), data.get("due_time", "23:59"))
-        )
-        conn.commit()
-        conn.close()
-        return jsonify({"message": "Task added"}), 201
-    except Exception as e:
-        return jsonify({"message": f"Error adding task: {str(e)}"}), 500
-
-@app.route("/todos/<int:id>", methods=["PUT"])
-def update_todo(id):
-    token = request.headers.get("Authorization", "").replace("Bearer ", "")
-    user_id = verify_token(token)
-
-    if not user_id:
-        return jsonify({"message": "Unauthorized"}), 401
-
-    data = request.json
-    conn = get_db()
-
-    # Check if todo belongs to user
-    todo = conn.execute("SELECT * FROM todos WHERE id=? AND user_id=?", (id, user_id)).fetchone()
-    if not todo:
-        conn.close()
-        return jsonify({"message": "Todo not found"}), 404
-
-    # get old values if blank update request
-    title = data.get("title") if data.get("title") is not None else todo["title"]
-    priority = data.get("priority") if data.get("priority") is not None else todo["priority"]
-    due_date = data.get("due_date") if data.get("due_date") is not None else todo["due_date"]
-    due_time = data.get("due_time") if data.get("due_time") is not None else todo["due_time"]
-    completed = data.get("completed") if data.get("completed") is not None else todo["completed"]
-    # Reset reminder_sent when due date/time changes so user gets a new reminder
-    reset_reminder = (data.get("due_date") is not None and data.get("due_date") != todo["due_date"]) or (data.get("due_time") is not None and data.get("due_time") != todo["due_time"])
-    reminder_sent = 0 if reset_reminder else (todo["reminder_sent"] if "reminder_sent" in todo.keys() else 0)
-
-    conn.execute("""
-        UPDATE todos 
-        SET title=?, priority=?, due_date=?, due_time=?, completed=?, reminder_sent=? 
-        WHERE id=? AND user_id=?
-    """, (title, priority, due_date, due_time, completed, reminder_sent, id, user_id))
-
-    conn.commit()
-    conn.close()
-    return jsonify({"message": "Updated"})
-
-# Delete task
-@app.route("/todos/<int:id>", methods=["DELETE"])
-def delete_todo(id):
-    token = request.headers.get("Authorization", "").replace("Bearer ", "")
-    user_id = verify_token(token)
-
-    if not user_id:
-        return jsonify({"message": "Unauthorized"}), 401
-
-    conn = get_db()
-    # Check if todo belongs to user
-    todo = conn.execute("SELECT * FROM todos WHERE id=? AND user_id=?", (id, user_id)).fetchone()
-    if not todo:
-        conn.close()
-        return jsonify({"message": "Todo not found"}), 404
-
-    conn.execute("DELETE FROM todos WHERE id=? AND user_id=?", (id, user_id))
-    conn.commit()
-    conn.close()
-    return jsonify({"message": "Deleted"})
-
-# ===== FOLDER ENDPOINTS =====
-# Get all folders for user
-@app.route("/folders", methods=["GET"])
-def get_folders():
-    token = request.headers.get("Authorization", "").replace("Bearer ", "")
-    user_id = verify_token(token)
-
-    if not user_id:
-        return jsonify({"message": "Unauthorized"}), 401
-
-    conn = get_db()
-    folders = conn.execute(
-        "SELECT * FROM folders WHERE user_id=? ORDER BY created_at DESC", 
-        (user_id,)
-    ).fetchall()
-    
-    # If user has no folders, create default "General" folder
-    if not folders:
-        conn.execute(
-            "INSERT INTO folders (user_id, name) VALUES (?, ?)",
-            (user_id, "General")
-        )
-        conn.commit()
-        folders = conn.execute(
-            "SELECT * FROM folders WHERE user_id=? ORDER BY created_at DESC", 
-            (user_id,)
-        ).fetchall()
-    
-    conn.close()
-    return jsonify([dict(row) for row in folders])
-
-# Create new folder
-@app.route("/folders", methods=["POST"])
-def create_folder():
-    token = request.headers.get("Authorization", "").replace("Bearer ", "")
-    user_id = verify_token(token)
-
-    if not user_id:
-        return jsonify({"message": "Unauthorized"}), 401
-
-    data = request.json
-    name = data.get("name")
-
-    if not name:
-        return jsonify({"message": "Missing folder name"}), 400
-
-    try:
-        conn = get_db()
-        conn.execute(
-            "INSERT INTO folders (user_id, name) VALUES (?, ?)",
-            (user_id, name)
-        )
-        conn.commit()
-        conn.close()
-        return jsonify({"message": "Folder created"}), 201
-    except Exception as e:
-        return jsonify({"message": f"Error creating folder: {str(e)}"}), 500
-
-# Update/Rename folder
-@app.route("/folders/<int:id>", methods=["PUT"])
-def update_folder(id):
-    token = request.headers.get("Authorization", "").replace("Bearer ", "")
-    user_id = verify_token(token)
-
-    if not user_id:
-        return jsonify({"message": "Unauthorized"}), 401
-
-    data = request.json
-    name = data.get("name")
-
-    if not name:
-        return jsonify({"message": "Missing folder name"}), 400
-
-    conn = get_db()
-    # Check if folder belongs to user
-    folder = conn.execute(
-        "SELECT * FROM folders WHERE id=? AND user_id=?", 
-        (id, user_id)
-    ).fetchone()
-    
-    if not folder:
-        conn.close()
-        return jsonify({"message": "Folder not found"}), 404
-
-    conn.execute(
-        "UPDATE folders SET name=? WHERE id=? AND user_id=?",
-        (name, id, user_id)
-    )
-    conn.commit()
-    conn.close()
-    return jsonify({"message": "Folder updated"})
-
-# Check if SMTP is configured (for debugging; does not expose secrets).
 @app.route("/smtp-status", methods=["GET"])
 def smtp_status():
     cfg = get_smtp_config()
     ok = bool(cfg["host"] and cfg["user"] and cfg["password"])
     return jsonify({"smtp_configured": ok, "host_set": bool(cfg["host"])}), 200
 
-# Trigger email reminders check (1 hour before deadline). Call via cron or use built-in scheduler.
-@app.route("/check-reminders", methods=["GET", "POST"])
-def trigger_check_reminders():
-    check_and_send_reminders()
-    return jsonify({"message": "Reminder check completed"}), 200
-
-# Delete folder
-@app.route("/folders/<int:id>", methods=["DELETE"])
-def delete_folder(id):
-    token = request.headers.get("Authorization", "").replace("Bearer ", "")
-    user_id = verify_token(token)
-
-    if not user_id:
-        return jsonify({"message": "Unauthorized"}), 401
-
-    conn = get_db()
-    # Check if folder belongs to user
-    folder = conn.execute(
-        "SELECT * FROM folders WHERE id=? AND user_id=?", 
-        (id, user_id)
-    ).fetchone()
-    
-    if not folder:
-        conn.close()
-        return jsonify({"message": "Folder not found"}), 404
-
-    # Delete all todos in this folder
-    conn.execute("DELETE FROM todos WHERE folder_id=? AND user_id=?", (id, user_id))
-    # Delete the folder itself
-    conn.execute("DELETE FROM folders WHERE id=? AND user_id=?", (id, user_id))
-    conn.commit()
-    conn.close()
-    return jsonify({"message": "Folder deleted"})
-
-# ===== NOTES & NOTEBOOKS ENDPOINTS =====
-@app.route("/notebooks", methods=["GET"])
-def get_notebooks():
-    token = request.headers.get("Authorization", "").replace("Bearer ", "")
-    user_id = verify_token(token)
-    if not user_id: return jsonify({"message": "Unauthorized"}), 401
-
-    conn = get_db()
-    notebooks = conn.execute("SELECT * FROM notebooks WHERE user_id=? ORDER BY created_at DESC", (user_id,)).fetchall()
-    
-    if not notebooks:
-        conn.execute("INSERT INTO notebooks (user_id, name) VALUES (?, ?)", (user_id, "My First Notebook"))
-        conn.commit()
-        notebooks = conn.execute("SELECT * FROM notebooks WHERE user_id=? ORDER BY created_at DESC", (user_id,)).fetchall()
-    
-    conn.close()
-    return jsonify([dict(row) for row in notebooks])
-
-@app.route("/notebooks", methods=["POST"])
-def create_notebook():
-    token = request.headers.get("Authorization", "").replace("Bearer ", "")
-    user_id = verify_token(token)
-    if not user_id: return jsonify({"message": "Unauthorized"}), 401
-
-    data = request.json
-    name = data.get("name")
-    if not name: return jsonify({"message": "Missing notebook name"}), 400
-
-    conn = get_db()
-    conn.execute("INSERT INTO notebooks (user_id, name) VALUES (?, ?)", (user_id, name))
-    conn.commit()
-    conn.close()
-    return jsonify({"message": "Notebook created"}), 201
-
-@app.route("/notebooks/<int:id>", methods=["DELETE"])
-def delete_notebook(id):
-    token = request.headers.get("Authorization", "").replace("Bearer ", "")
-    user_id = verify_token(token)
-    if not user_id: return jsonify({"message": "Unauthorized"}), 401
-
-    conn = get_db()
-    nb = conn.execute("SELECT * FROM notebooks WHERE id=? AND user_id=?", (id, user_id)).fetchone()
-    if not nb:
-        conn.close()
-        return jsonify({"message": "Notebook not found"}), 404
-
-    conn.execute("DELETE FROM notes WHERE notebook_id=? AND user_id=?", (id, user_id))
-    conn.execute("DELETE FROM notebooks WHERE id=? AND user_id=?", (id, user_id))
-    conn.commit()
-    conn.close()
-    return jsonify({"message": "Notebook deleted"})
-
-@app.route("/notes", methods=["GET"])
-def get_notes():
-    token = request.headers.get("Authorization", "").replace("Bearer ", "")
-    user_id = verify_token(token)
-    if not user_id: return jsonify({"message": "Unauthorized"}), 401
-
-    notebook_id = request.args.get("notebook_id")
-    conn = get_db()
-    
-    if notebook_id:
-        notes = conn.execute("SELECT * FROM notes WHERE user_id=? AND notebook_id=? ORDER BY updated_at DESC", (user_id, notebook_id)).fetchall()
-    else:
-        notes = conn.execute("SELECT * FROM notes WHERE user_id=? ORDER BY updated_at DESC", (user_id,)).fetchall()
-    
-    conn.close()
-    return jsonify([dict(row) for row in notes])
-
-@app.route("/notes", methods=["POST"])
-def add_note():
-    token = request.headers.get("Authorization", "").replace("Bearer ", "")
-    user_id = verify_token(token)
-    if not user_id: return jsonify({"message": "Unauthorized"}), 401
-
-    data = request.json
-    notebook_id = data.get("notebook_id")
-    title = data.get("title", "Untitled")
-    section = data.get("section", "General")
-    content = data.get("content", "")
-
-    if not notebook_id: return jsonify({"message": "Missing notebook ID"}), 400
-
-    conn = get_db()
-    cursor = conn.execute(
-        "INSERT INTO notes (user_id, notebook_id, section, title, content) VALUES (?, ?, ?, ?, ?)",
-        (user_id, notebook_id, section, title, content)
-    )
-    conn.commit()
-    note_id = cursor.lastrowid
-    conn.close()
-    return jsonify({"message": "Note added", "id": note_id}), 201
-
-@app.route("/notes/<int:id>", methods=["PUT"])
-def update_note(id):
-    token = request.headers.get("Authorization", "").replace("Bearer ", "")
-    user_id = verify_token(token)
-    if not user_id: return jsonify({"message": "Unauthorized"}), 401
-
-    data = request.json
-    conn = get_db()
-    note = conn.execute("SELECT * FROM notes WHERE id=? AND user_id=?", (id, user_id)).fetchone()
-    if not note:
-        conn.close()
-        return jsonify({"message": "Note not found"}), 404
-
-    title = data.get("title") if data.get("title") is not None else note["title"]
-    section = data.get("section") if data.get("section") is not None else note["section"]
-    content = data.get("content") if data.get("content") is not None else note["content"]
-
-    conn.execute(
-        "UPDATE notes SET title=?, section=?, content=?, updated_at=CURRENT_TIMESTAMP WHERE id=? AND user_id=?",
-        (title, section, content, id, user_id)
-    )
-    conn.commit()
-    conn.close()
-    return jsonify({"message": "Updated"})
-
-@app.route("/notes/<int:id>", methods=["DELETE"])
-def delete_note(id):
-    token = request.headers.get("Authorization", "").replace("Bearer ", "")
-    user_id = verify_token(token)
-    if not user_id: return jsonify({"message": "Unauthorized"}), 401
-
-    conn = get_db()
-    note = conn.execute("SELECT * FROM notes WHERE id=? AND user_id=?", (id, user_id)).fetchone()
-    if not note:
-        conn.close()
-        return jsonify({"message": "Note not found"}), 404
-
-    conn.execute("DELETE FROM notes WHERE id=? AND user_id=?", (id, user_id))
-    conn.commit()
-    conn.close()
-    return jsonify({"message": "Deleted"})
-
-# Serve frontend static files (must be AFTER all API routes)
+# Serve frontend static files
 @app.route("/<path:filename>")
 def serve_static(filename):
     try:
@@ -688,16 +662,5 @@ def serve_static(filename):
     except:
         return jsonify({"message": "File not found"}), 404
 
-# Run reminder check when SMTP is configured
-from apscheduler.schedulers.background import BackgroundScheduler
-
-scheduler = BackgroundScheduler()
-scheduler.add_job(check_and_send_reminders, "interval", minutes=2, id="reminder_check")
-_cfg = get_smtp_config()
-if _cfg["host"] and _cfg["user"]:
-    scheduler.start()
-    print("[Reminder] Scheduler started (every 2 min). Running first check now.")
-    check_and_send_reminders()
-
 if __name__ == "__main__":
-    app.run(debug=True, port=9999) 
+    app.run(debug=True, port=9999)

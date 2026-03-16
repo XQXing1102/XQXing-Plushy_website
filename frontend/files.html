@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Files - XQXing-Plushy Tools</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/files.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <header class="global-header">
+    <div class="header-content">
+      <a href="index.html" class="logo">🧸 XQXing-Plushy</a>
+      <nav class="header-nav">
+        <a href="index.html" class="nav-link">Home</a>
+        <span id="nav-username" class="nav-user"></span>
+        <button onclick="logout()" class="nav-btn">Logout</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="files-container">
+    <div class="files-sidebar">
+      <div class="files-actions">
+        <button onclick="openUploadModal()" class="upload-btn">📤 Upload File</button>
+        <button onclick="createNewFile()" class="new-folder-btn">➕ New Folder</button>
+      </div>
+      
+      <div class="file-filters">
+        <button class="filter-btn active" data-filter="all" onclick="filterFiles('all')">
+          <span class="filter-icon">📁</span> All Files
+        </button>
+        <button class="filter-btn" data-filter="note" onclick="filterFiles('note')">
+          <span class="filter-icon">📓</span> Notes
+        </button>
+        <button class="filter-btn" data-filter="mindmap" onclick="filterFiles('mindmap')">
+          <span class="filter-icon">🧠</span> Mind Maps
+        </button>
+        <button class="filter-btn" data-filter="document" onclick="filterFiles('document')">
+          <span class="filter-icon">📄</span> Documents
+        </button>
+        <button class="filter-btn" data-filter="image" onclick="filterFiles('image')">
+          <span class="filter-icon">🖼️</span> Images
+        </button>
+      </div>
+
+      <div class="storage-info">
+        <div class="storage-bar">
+          <div class="storage-used" id="storage-used" style="width: 0%"></div>
+        </div>
+        <span id="storage-text">0 MB / 100 MB used</span>
+      </div>
+
+      <div class="import-section">
+        <h4>Import from Notes</h4>
+        <button onclick="importNotesToFiles()" class="import-notes-btn">📓 Import All Notes</button>
+      </div>
+    </div>
+
+    <div class="files-main">
+      <div class="files-header">
+        <h1 id="current-folder-name">My Files</h1>
+        <div class="view-toggle">
+          <button class="view-btn active" data-view="grid" onclick="setView('grid')">▦</button>
+          <button class="view-btn" data-view="list" onclick="setView('list')">☰</button>
+        </div>
+      </div>
+
+      <div id="files-grid" class="files-grid"></div>
+      
+      <div id="files-list" class="files-list hidden">
+        <div class="list-header">
+          <span class="col-name">Name</span>
+          <span class="col-type">Type</span>
+          <span class="col-size">Size</span>
+          <span class="col-date">Modified</span>
+          <span class="col-actions">Actions</span>
+        </div>
+        <div id="list-content"></div>
+      </div>
+
+      <div id="empty-state" class="empty-state hidden">
+        <div class="empty-icon">📂</div>
+        <h3>No files yet</h3>
+        <p>Upload files or create folders to get started</p>
+        <button onclick="openUploadModal()" class="upload-btn">📤 Upload</button>
+      </div>
+    </div>
+  </main>
+
+  <!-- Upload Modal -->
+  <div id="upload-modal" class="modal-overlay hidden">
+    <div class="modal-content upload-modal">
+      <div class="modal-header">
+        <h2>📤 Upload Files</h2>
+        <button class="modal-close" onclick="closeUploadModal()">✕</button>
+      </div>
+      <div class="upload-area" id="drop-zone">
+        <input type="file" id="file-input" multiple hidden>
+        <div class="drop-content">
+          <span class="drop-icon">📁</span>
+          <p>Drag & drop files here or <button onclick="document.getElementById('file-input').click()">browse</button></p>
+          <small>Max 10MB per file</small>
+        </div>
+      </div>
+      <div id="upload-progress" class="upload-progress hidden">
+        <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+        <span id="progress-text">Uploading...</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create Folder Modal -->
+  <div id="folder-modal" class="modal-overlay hidden">
+    <div class="modal-content folder-modal">
+      <div class="modal-header">
+        <h2>➕ Create Folder</h2>
+        <button class="modal-close" onclick="closeFolderModal()">✕</button>
+      </div>
+      <div class="folder-form">
+        <input type="text" id="folder-name-input" placeholder="Folder name" maxlength="50">
+        <div class="form-actions">
+          <button onclick="confirmCreateFolder()" class="btn primary">Create</button>
+          <button onclick="closeFolderModal()" class="btn secondary">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Preview Modal -->
+  <div id="preview-modal" class="modal-overlay hidden">
+    <div class="modal-content preview-modal">
+      <div class="modal-header">
+        <h2 id="preview-title">File Preview</h2>
+        <div class="preview-actions">
+          <button onclick="printFile()" class="btn">🖨️ Print</button>
+          <button onclick="downloadFile()" class="btn">⬇️ Download</button>
+          <button class="modal-close" onclick="closePreviewModal()">✕</button>
+        </div>
+      </div>
+      <div id="preview-content" class="preview-content"></div>
+    </div>
+  </div>
+
+  <!-- File Info Modal -->
+  <div id="info-modal" class="modal-overlay hidden">
+    <div class="modal-content info-modal">
+      <div class="modal-header">
+        <h2>ℹ️ File Info</h2>
+        <button class="modal-close" onclick="closeInfoModal()">✕</button>
+      </div>
+      <div id="file-info-content" class="info-content"></div>
+    </div>
+  </div>
+
+  <script src="auth/auth.js"></script>
+  <script src="js/files.js"></script>
+</body>
+</html>

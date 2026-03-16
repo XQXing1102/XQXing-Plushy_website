@@ -1,0 +1,16 @@
+# Cloudflare Pages Configuration
+
+## To deploy:
+
+1. Go to https://dash.cloudflare.com
+2. Click "Pages" > "Create a project"
+3. Connect your GitHub repo or upload directly
+4. Set these settings:
+   - Build command: (leave empty)
+   - Build output: (leave empty)  
+   - Root directory: /frontend
+5. Deploy!
+
+## For SPA routing (redirects):
+*/
+index.html 200
