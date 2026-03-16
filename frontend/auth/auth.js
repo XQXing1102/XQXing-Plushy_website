@@ -2,7 +2,7 @@ const API =
   window.location.hostname === "127.0.0.1" ||
   window.location.hostname === "localhost"
     ? "http://127.0.0.1:9999"
-    : "https://your-backend-url.com";
+    : "https://xqpltool.guoharry267.workers.dev";
 
 async function handleLogin(event) {
   event.preventDefault();
