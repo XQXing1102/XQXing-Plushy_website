@@ -579,12 +579,28 @@ class Calculator {
     }
 
     // ===== VECTORS =====
-    vectorAdd(a, b) { return a.map((v, i) => v + (b[i] || 0)); }
-    vectorSub(a, b) { return a.map((v, i) => v - (b[i] || 0)); }
-    vectorDot(a, b) { return a.reduce((s, v, i) => s + v * (b[i] || 0), 0); }
-    vectorMag(v) { return Math.sqrt(v.reduce((s, x) => s + x * x, 0)); }
-    vectorScale(v, k) { return v.map(x => x * k); }
+    vectorAdd(a, b) { 
+        if (!a || !b || a.length === 0 || b.length === 0) return [];
+        return a.map((v, i) => v + (b[i] || 0)); 
+    }
+    vectorSub(a, b) { 
+        if (!a || !b || a.length === 0 || b.length === 0) return [];
+        return a.map((v, i) => v - (b[i] || 0)); 
+    }
+    vectorDot(a, b) { 
+        if (!a || !b || a.length === 0 || b.length === 0) return 0;
+        return a.reduce((s, v, i) => s + v * (b[i] || 0), 0); 
+    }
+    vectorMag(v) { 
+        if (!v || v.length === 0) return 0;
+        return Math.sqrt(v.reduce((s, x) => s + x * x, 0)); 
+    }
+    vectorScale(v, k) { 
+        if (!v || v.length === 0) return [];
+        return v.map(x => x * k); 
+    }
     angleBetweenVectors(a, b) {
+        if (!a || !b || a.length === 0 || b.length === 0) return NaN;
         const dot = this.vectorDot(a, b), ma = this.vectorMag(a), mb = this.vectorMag(b);
         if (ma < 1e-10 || mb < 1e-10) return NaN;
         return this.fromRadians(Math.acos(Math.max(-1, Math.min(1, dot / (ma * mb)))));
@@ -782,10 +798,20 @@ class Calculator {
 
     // ===== MATRIX OPERATIONS =====
     matrixAdd(A, B) {
-        return A.map((row, i) => row.map((val, j) => val + B[i][j]));
+        if (!A || !B || A.length === 0 || B.length === 0) return [];
+        if (A.length !== B.length || A[0].length !== B[0].length) {
+            alert('Matrices must have the same dimensions');
+            return [];
+        }
+        return A.map((row, i) => row.map((val, j) => val + (B[i] ? B[i][j] : 0)));
     }
 
     matrixMultiply(A, B) {
+        if (!A || !B || A.length === 0 || B.length === 0) return [];
+        if (A[0].length !== B.length) {
+            alert('Matrix dimensions incompatible for multiplication');
+            return [];
+        }
         const result = [];
         for (let i = 0; i < A.length; i++) {
             result[i] = [];
@@ -801,7 +827,12 @@ class Calculator {
     }
 
     matrixDeterminant(A) {
+        if (!A || A.length === 0 || A[0].length === 0) return 0;
         const n = A.length;
+        if (!A[0] || A[0].length !== n) {
+            alert('Matrix must be square');
+            return 0;
+        }
         if (n === 1) return A[0][0];
         if (n === 2) return A[0][0] * A[1][1] - A[0][1] * A[1][0];
         
@@ -814,14 +845,22 @@ class Calculator {
     }
 
     matrixTranspose(A) {
-        return A[0].map((_, i) => A.map(row => row[i]));
+        if (!A || A.length === 0 || A[0].length === 0) return [];
+        return A[0].map((_, i) => A.map(row => row[i] || 0));
     }
 
     matrixInverse(A) {
+        if (!A || A.length === 0) return null;
         const n = A.length;
-        if (n !== A[0].length) return null;
+        if (n !== A[0].length) {
+            alert('Matrix must be square');
+            return null;
+        }
         const det = this.matrixDeterminant(A);
-        if (Math.abs(det) < 1e-10) return null;
+        if (Math.abs(det) < 1e-10) {
+            alert('Matrix is singular (determinant is 0)');
+            return null;
+        }
         const adj = [];
         for (let i = 0; i < n; i++) {
             adj[i] = [];
@@ -835,7 +874,12 @@ class Calculator {
     }
 
     matrixSubtract(A, B) {
-        return A.map((row, i) => row.map((val, j) => val - B[i][j]));
+        if (!A || !B || A.length === 0 || B.length === 0) return [];
+        if (A.length !== B.length || A[0].length !== B[0].length) {
+            alert('Matrices must have the same dimensions');
+            return [];
+        }
+        return A.map((row, i) => row.map((val, j) => val - (B[i] ? B[i][j] : 0)));
     }
 
     // ===== CONSTANTS =====
@@ -1734,8 +1778,12 @@ class Calculator {
         this.updateDisplay();
     }
     parseMatrix2D(str) {
+        if (!str || typeof str !== 'string') return [];
         const rows = str.trim().split(/[;\n]+/);
-        return rows.map(row => row.split(/[\s,]+/).map(Number));
+        return rows.map(row => {
+            const vals = row.split(/[\s,]+/).map(Number).filter(n => !isNaN(n));
+            return vals.length > 0 ? vals : [0];
+        }).filter(row => row.length > 0);
     }
     showMatrixDetUI() {
         const s = prompt('Enter matrix (rows separated by ; or newline)\nExample: 1 2 ; 3 4');
@@ -1816,7 +1864,9 @@ class Calculator {
         this.updateDisplay();
     }
     parseVector(str) {
-        return str.trim().split(/[\s,]+/).map(Number).filter(n => !isNaN(n));
+        if (!str || typeof str !== 'string') return [];
+        const v = str.trim().split(/[\s,]+/).map(Number).filter(n => !isNaN(n));
+        return v.length > 0 ? v : [];
     }
     showVectorDotUI() {
         const a = this.parseVector(prompt('Vector A (e.g. 1 2 or 1,2,3):'));
