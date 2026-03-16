@@ -1,6 +1,7 @@
-name = "xqpl-tool"
+name = "xqpltool"
 main = "worker.py"
 compatibility_date = "2024-01-01"
+compatibility_flags = ["python_workers"]
 
 [vars]
 SUPABASE_URL = "https://vmtvzhcwsoycuzgclgdu.supabase.co"
