@@ -110,6 +110,7 @@
                 <option value="circle">Circle</option>
                 <option value="diamond">Diamond</option>
                 <option value="hexagon">Hexagon</option>
+                <option value="cloud">Cloud</option>
               </select>
             </div>
             <div class="style-row">
@@ -134,10 +135,26 @@
                 <option value="Times New Roman, serif">Times</option>
               </select>
             </div>
+            <div class="style-section-title">Box Size</div>
+            <div class="style-row">
+              <label>Width:</label>
+              <input type="number" id="node-width" placeholder="auto" min="50" max="400">
+            </div>
+            <div class="style-row">
+              <label>Height:</label>
+              <input type="number" id="node-height" placeholder="auto" min="30" max="200">
+            </div>
+            <div class="style-row">
+              <label>Min Width:</label>
+              <input type="number" id="node-min-width" placeholder="auto" min="50" max="400">
+            </div>
+            <div class="style-row">
+              <label>Min Height:</label>
+              <input type="number" id="node-min-height" placeholder="auto" min="30" max="200">
+            </div>
             <div class="style-actions">
-              <button onclick="saveStyle()" class="mm-btn primary">Apply</button>
-              <button onclick="deleteNode(selectedNodeId)" class="mm-btn danger">Delete</button>
-              <button onclick="hideStyleEditor()" class="mm-btn">Cancel</button>
+              <button onclick="deleteNode(selectedNodeId)" class="mm-btn danger">Delete Node</button>
+              <button onclick="hideStyleEditor()" class="mm-btn">Close</button>
             </div>
           </div>
         </div>
@@ -153,7 +170,7 @@
         </div>
         
         <div class="mm-help">
-          💡 Double-click to add child • Drag to move • Click to edit • Ctrl+Click for style • Right-click to delete • Auto-saves
+          💡 Hover node to show + buttons • Drag to move • Click to edit • Alt+Click to select • Ctrl+Click for style • Right-click to delete • Auto-saves
         </div>
       </div>
     </div>

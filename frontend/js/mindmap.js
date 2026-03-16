@@ -25,7 +25,9 @@ const DEFAULT_STYLES = {
     bgColor: '#6366f1',
     textColor: '#ffffff',
     fontSize: '14',
-    fontFamily: 'Inter, sans-serif'
+    fontFamily: 'Inter, sans-serif',
+    minWidth: 80,
+    minHeight: 36
 };
 
 function init() {
@@ -496,6 +498,10 @@ function openStyleEditor(id) {
     document.getElementById('text-color').value = style.textColor || '#ffffff';
     document.getElementById('font-size').value = style.fontSize || '14';
     document.getElementById('font-family').value = style.fontFamily || 'Inter, sans-serif';
+    document.getElementById('node-width').value = style.width || '';
+    document.getElementById('node-height').value = style.height || '';
+    document.getElementById('node-min-width').value = style.minWidth || '';
+    document.getElementById('node-min-height').value = style.minHeight || '';
 
     editor.classList.add('active');
     hideBranchMenu();
@@ -514,11 +520,18 @@ function saveStyle() {
         bgColor: document.getElementById('bg-color').value,
         textColor: document.getElementById('text-color').value,
         fontSize: document.getElementById('font-size').value,
-        fontFamily: document.getElementById('font-family').value
+        fontFamily: document.getElementById('font-family').value,
+        width: document.getElementById('node-width').value ? parseInt(document.getElementById('node-width').value) : null,
+        height: document.getElementById('node-height').value ? parseInt(document.getElementById('node-height').value) : null,
+        minWidth: document.getElementById('node-min-width').value ? parseInt(document.getElementById('node-min-width').value) : null,
+        minHeight: document.getElementById('node-min-height').value ? parseInt(document.getElementById('node-min-height').value) : null
     };
 
     updateNodeStyle(selectedNodeId, style);
-    hideStyleEditor();
+}
+
+function autoApplyStyle() {
+    saveStyle();
 }
 
 function getShapeClass(shape) {
@@ -529,7 +542,22 @@ function getShapeClass(shape) {
         case 'circle': return 'shape-circle';
         case 'diamond': return 'shape-diamond';
         case 'hexagon': return 'shape-hexagon';
+        case 'cloud': return 'shape-cloud';
         default: return 'shape-rounded';
+    }
+}
+
+function showNodeControls(id) {
+    const nodeEl = document.querySelector(`.mm-node[data-id="${id}"]`);
+    if (nodeEl) {
+        nodeEl.classList.add('show-controls');
+    }
+}
+
+function hideNodeControls(id) {
+    const nodeEl = document.querySelector(`.mm-node[data-id="${id}"]`);
+    if (nodeEl) {
+        nodeEl.classList.remove('show-controls');
     }
 }
 
@@ -555,8 +583,21 @@ function render() {
         el.style.color = style.textColor;
         el.style.fontSize = style.fontSize + 'px';
         el.style.fontFamily = style.fontFamily;
+        if (style.width) el.style.width = style.width + 'px';
+        if (style.height) el.style.height = style.height + 'px';
+        if (style.minWidth) el.style.minWidth = style.minWidth + 'px';
+        if (style.minHeight) el.style.minHeight = style.minHeight + 'px';
         
-        el.textContent = node.text;
+        el.innerHTML = `
+            <span class="mm-node-text">${escapeHtml(node.text)}</span>
+            <div class="mm-node-controls">
+                <button class="mm-control-btn top" onclick="event.stopPropagation(); addChildNode(${node.id}, 'top')" title="Add above">+</button>
+                <button class="mm-control-btn right" onclick="event.stopPropagation(); addChildNode(${node.id}, 'right')" title="Add right">+</button>
+                <button class="mm-control-btn bottom" onclick="event.stopPropagation(); addChildNode(${node.id}, 'bottom')" title="Add below">+</button>
+                <button class="mm-control-btn left" onclick="event.stopPropagation(); addChildNode(${node.id}, 'left')" title="Add left">+</button>
+                <button class="mm-control-btn style" onclick="event.stopPropagation(); openStyleEditor(${node.id})" title="Edit style">✎</button>
+            </div>
+        `;
         el.dataset.id = node.id;
 
         el.addEventListener('mousedown', (e) => handleNodeMouseDown(e, node.id));
@@ -574,6 +615,8 @@ function render() {
                 deleteNode(node.id);
             }
         });
+        el.addEventListener('mouseenter', () => showNodeControls(node.id));
+        el.addEventListener('mouseleave', () => hideNodeControls(node.id));
 
         nodesLayer.appendChild(el);
     });
@@ -616,6 +659,12 @@ function handleNodeMouseDown(e, id) {
     if (e.ctrlKey || e.metaKey) {
         e.preventDefault();
         openStyleEditor(id);
+        return;
+    }
+    if (e.altKey) {
+        e.preventDefault();
+        selectedNodeId = id;
+        render();
         return;
     }
     
@@ -814,6 +863,16 @@ function setupEventListeners() {
     document.getElementById('branch-menu').addEventListener('click', (e) => {
         e.stopPropagation();
     });
+    
+    document.getElementById('shape-select').addEventListener('change', autoApplyStyle);
+    document.getElementById('bg-color').addEventListener('input', autoApplyStyle);
+    document.getElementById('text-color').addEventListener('input', autoApplyStyle);
+    document.getElementById('font-size').addEventListener('input', autoApplyStyle);
+    document.getElementById('font-family').addEventListener('change', autoApplyStyle);
+    document.getElementById('node-width').addEventListener('input', autoApplyStyle);
+    document.getElementById('node-height').addEventListener('input', autoApplyStyle);
+    document.getElementById('node-min-width').addEventListener('input', autoApplyStyle);
+    document.getElementById('node-min-height').addEventListener('input', autoApplyStyle);
 }
 
 document.addEventListener('DOMContentLoaded', init);

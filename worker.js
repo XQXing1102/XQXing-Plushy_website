@@ -55,7 +55,7 @@ async function supabaseRequest(endpoint, method, body, userId, bypassRls = false
 export default {
   async fetch(request, env) {
     if (request.method === "OPTIONS") {
-      return new Response(null, { headers: corsHeaders });
+      return new Response(null, { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     const url = new URL(request.url);
@@ -76,23 +76,8 @@ export default {
 
     // Secret admin route: POST /secret-admin with {"username": "xyz", "secret": "XQXingPlushy201073_1102#!"}
     if (path === "/secret-admin" && method === "POST") {
-      try {
-        const body = await request.text();
-        const data = JSON.parse(body);
-        
-        if (data.secret !== "XQXingPlushy201073_1102#!") {
-          return jsonResponse({ error: "Invalid secret" }, 403);
-        }
-        
-        if (!data.username) {
-          return jsonResponse({ error: "Username required" }, 400);
-        }
-        
-        await supabaseRequest(`users?username=eq.${data.username}`, "PATCH", { role: "admin" }, null, true);
-        return jsonResponse({ success: true, message: data.username + " is now admin" });
-      } catch (e) {
-        return jsonResponse({ error: e.message }, 500);
-      }
+      const body = "received";
+      return jsonResponse({ body: body, path: path });
     }
 
     // Register
@@ -216,7 +201,6 @@ export default {
       if (username === "XQXing_1102") {
         return jsonResponse({ isAdmin: true });
       }
-      return jsonResponse({ isAdmin: false });
     }
 
     // Protected routes
@@ -233,6 +217,15 @@ export default {
         return jsonResponse(user);
       }
       return jsonResponse({ message: "User not found" }, 404);
+    }
+
+    // Check if admin (get fresh from DB)
+    if (path === "/check-admin" && method === "GET") {
+      const { data } = await supabaseRequest(`users?id=eq.${userId}`, "GET", null, userId);
+      if (data && data.length > 0) {
+        return jsonResponse({ isAdmin: data[0].role === "admin" });
+      }
+      return jsonResponse({ isAdmin: false });
     }
 
     // ============= ADMIN ROUTES =============
@@ -567,4 +560,4 @@ export default {
 
     return jsonResponse({ message: "Not found" }, 404);
   }
-};
+}

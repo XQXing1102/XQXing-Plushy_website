@@ -1,16 +1,7 @@
-# Cloudflare Pages Configuration
+# Cloudflare Pages - SPA routing
+# Serve xyz123.html for secret commands (don't redirect)
+/xyz123.html /xyz123.html 200
 
-## To deploy:
-
-1. Go to https://dash.cloudflare.com
-2. Click "Pages" > "Create a project"
-3. Connect your GitHub repo or upload directly
-4. Set these settings:
-   - Build command: (leave empty)
-   - Build output: (leave empty)  
-   - Root directory: /frontend
-5. Deploy!
-
-## For SPA routing (redirects):
-*/
+# All other routes go to index.html
+/*
 index.html 200

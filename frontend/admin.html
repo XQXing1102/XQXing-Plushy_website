@@ -316,10 +316,10 @@
     }
     
     // Check if admin
-    fetch(API + "/me", { headers: { Authorization: "Bearer " + token } })
+    fetch(API + "/check-admin", { headers: { Authorization: "Bearer " + token } })
       .then(r => r.json())
-      .then(user => {
-        if (user.role !== "admin") {
+      .then(data => {
+        if (!data.isAdmin) {
           window.location.href = "/index.html";
         }
       });

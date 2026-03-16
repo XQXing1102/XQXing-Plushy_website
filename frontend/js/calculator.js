@@ -11,10 +11,15 @@ class Calculator {
         this.history = [];
         this.memory = 0;
         this.variables = {};  // A-Z, M (separate from memory for M+)
+        this.vectorStorage = {};  // Named vector storage
+        this.matrixStorage = {};  // Named matrix storage
         this.statsList = [];  // For mean, median, mode, σ, etc.
         this.angleMode = 'degree'; // degree, radian, grad
         this.displayMode = 'fix'; // fix, sci, eng
         this.decimalPlaces = 10;
+        
+        this.expressionHistory = [];  // Expression replay
+        this.historyIndex = -1;
         
         this.graphFolders = JSON.parse(localStorage.getItem('graphFolders')) || [];
         this.currentGraphs = new Map();
@@ -44,7 +49,9 @@ class Calculator {
 
     addGraphEquation() {
         const input = document.getElementById('graphInput').value.trim();
+        const input2 = document.getElementById('graphInput2').value.trim();
         const color = document.getElementById('graphColor').value || '#3b82f6';
+        const mode = document.getElementById('graphMode').value;
         
         if (!input) {
             alert('Enter an equation or function');
@@ -52,30 +59,55 @@ class Calculator {
         }
 
         try {
-            // Accept y = f(x) or just f(x)
-            let equation = input;
+            const graphId = 'graph_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            let latex = '';
             
-            // If it doesn't contain '=', assume it's y = f(x)
-            if (!equation.includes('=')) {
-                equation = 'y = ' + equation;
+            if (mode === 'cartesian') {
+                let equation = input;
+                if (!equation.includes('=')) {
+                    equation = 'y = ' + equation;
+                }
+                const testExpr = equation.split('=')[1].trim();
+                this.evaluateFunctionAt(testExpr, 'x', 0);
+                latex = equation;
+                this.desmos.setExpression({ id: graphId, latex: equation, color: color });
             }
-
-            // Validate by trying to evaluate at a test point
-            const testExpr = equation.split('=')[1].trim();
-            this.evaluateFunctionAt(testExpr, 'x', 0);
-
-            // Add to Desmos
-            this.desmos.setExpression({
-                id: input,
-                latex: equation,
-                color: color,
-            });
+            else if (mode === 'parametric') {
+                const xExpr = input || 'x = t';
+                const yExpr = input2 || 'y = t';
+                if (!xExpr.includes('=')) {
+                    this.evaluateFunctionAt(xExpr, 't', 0);
+                }
+                if (!yExpr.includes('=')) {
+                    this.evaluateFunctionAt(yExpr, 't', 0);
+                }
+                latex = `${xExpr}, ${yExpr}`;
+                this.desmos.setExpression({ id: graphId, latex: xExpr.includes('=') ? xExpr : 'x='+xExpr, color: color });
+                const graphId2 = graphId + '_y';
+                this.desmos.setExpression({ id: graphId2, latex: yExpr.includes('=') ? yExpr : 'y='+yExpr, color: color });
+                this.currentGraphs.set(graphId, { latex: latex, color: color, originalInput: input + ',' + input2, type: 'parametric' });
+                document.getElementById('graphInput').value = '';
+                document.getElementById('graphInput2').value = '';
+                document.getElementById('graphColor').value = '';
+                return;
+            }
+            else if (mode === 'polar') {
+                let rExpr = input;
+                if (!rExpr.includes('=')) {
+                    rExpr = 'r = ' + rExpr;
+                }
+                const testExpr = rExpr.split('=')[1].trim();
+                this.evaluateFunctionAt(testExpr, 'theta', 0);
+                latex = rExpr;
+                this.desmos.setExpression({ id: graphId, latex: rExpr, color: color });
+            }
             
-            this.currentGraphs.set(input, { latex: equation, color: color });
+            this.currentGraphs.set(graphId, { latex: latex, color: color, originalInput: input, type: mode });
             document.getElementById('graphInput').value = '';
+            document.getElementById('graphInput2').value = '';
             document.getElementById('graphColor').value = '';
         } catch (e) {
-            alert('Invalid function. Make sure to use valid syntax like:\ny = x^2\ny = sin(x)\ny = 1/(x-2)\ny = sqrt(x)');
+            alert('Invalid function. Examples:\nCartesian: y = sin(x), y = x^2\nParametric: x = cos(t), y = sin(t)\nPolar: r = 2*cos(theta), r = 1 + sin(theta)');
         }
     }
 
@@ -141,12 +173,13 @@ class Calculator {
 
         this.clearGraph();
         folder.graphs.forEach(graph => {
+            const graphId = 'graph_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
             this.desmos.setExpression({
-                id: graph.expression,
+                id: graphId,
                 latex: graph.latex,
                 color: graph.color,
             });
-            this.currentGraphs.set(graph.expression, { latex: graph.latex, color: graph.color });
+            this.currentGraphs.set(graphId, { latex: graph.latex, color: graph.color, originalInput: graph.expression });
         });
     }
 
@@ -367,6 +400,125 @@ class Calculator {
     boolNot(a) { return a ? 0 : 1; }
     boolXor(a, b) { return (a !== b) ? 1 : 0; }
 
+    // ===== COMPLEX NUMBERS =====
+    complexAdd(a, b) {
+        return { re: a.re + b.re, im: a.im + b.im };
+    }
+    complexSub(a, b) {
+        return { re: a.re - b.re, im: a.im - b.im };
+    }
+    complexMul(a, b) {
+        return { re: a.re * b.re - a.im * b.im, im: a.re * b.im + a.im * b.re };
+    }
+    complexDiv(a, b) {
+        const denom = b.re * b.re + b.im * b.im;
+        if (denom === 0) return { re: NaN, im: NaN };
+        return {
+            re: (a.re * b.re + a.im * b.im) / denom,
+            im: (a.im * b.re - a.re * b.im) / denom
+        };
+    }
+    complexConj(a) {
+        return { re: a.re, im: -a.im };
+    }
+    complexMag(a) {
+        return Math.sqrt(a.re * a.re + a.im * a.im);
+    }
+    complexArg(a) {
+        return this.fromRadians(Math.atan2(a.im, a.re));
+    }
+    complexToPolar(a) {
+        return { r: this.complexMag(a), theta: this.complexArg(a) };
+    }
+    polarToComplex(r, theta) {
+        const rad = this.toRadians(theta);
+        return { re: r * Math.cos(rad), im: r * Math.sin(rad) };
+    }
+
+    // ===== DATE CALCULATOR =====
+    daysBetween(date1, date2) {
+        const d1 = new Date(date1);
+        const d2 = new Date(date2);
+        const diff = Math.abs(d2 - d1);
+        return Math.ceil(diff / (1000 * 60 * 60 * 24));
+    }
+    addDays(date, days) {
+        const result = new Date(date);
+        result.setDate(result.getDate() + days);
+        return result.toISOString().split('T')[0];
+    }
+    dayOfWeek(date) {
+        const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        return days[new Date(date).getDay()];
+    }
+    weekNumber(date) {
+        const d = new Date(date);
+        d.setHours(0, 0, 0, 0);
+        d.setDate(d.getDate() + 4 - (d.getDay() || 7));
+        const yearStart = new Date(d.getFullYear(), 0, 1);
+        return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+    }
+
+    // ===== FINANCE =====
+    compoundInterest(principal, rate, n, t) {
+        return principal * Math.pow(1 + rate / n, n * t);
+    }
+    loanPayment(principal, annualRate, years, paymentsPerYear) {
+        const r = annualRate / paymentsPerYear;
+        const n = years * paymentsPerYear;
+        if (r === 0) return principal / n;
+        return principal * (r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
+    }
+    totalLoanPayment(principal, annualRate, years, paymentsPerYear) {
+        return this.loanPayment(principal, annualRate, years, paymentsPerYear) * years * paymentsPerYear;
+    }
+    totalInterest(principal, annualRate, years, paymentsPerYear) {
+        return this.totalLoanPayment(principal, annualRate, years, paymentsPerYear) - principal;
+    }
+
+    // ===== HEALTH =====
+    calculateBMI(weight, heightCm) {
+        const heightM = heightCm / 100;
+        return weight / (heightM * heightM);
+    }
+    bmiCategory(bmi) {
+        if (bmi < 18.5) return 'Underweight';
+        if (bmi < 25) return 'Normal';
+        if (bmi < 30) return 'Overweight';
+        return 'Obese';
+    }
+    calculateBMR(weight, heightCm, age, isMale) {
+        if (isMale) {
+            return 10 * weight + 6.25 * heightCm - 5 * age + 5;
+        }
+        return 10 * weight + 6.25 * heightCm - 5 * age - 161;
+    }
+    tdee(bmr, activityLevel) {
+        const multipliers = { sedentary: 1.2, light: 1.375, moderate: 1.55, active: 1.725, veryActive: 1.9 };
+        return bmr * (multipliers[activityLevel] || 1.2);
+    }
+
+    // ===== DATA STORAGE CONVERTER =====
+    dataConvert(value, from, to) {
+        const toBytes = { B: 1, KB: 1024, MB: 1024 ** 2, GB: 1024 ** 3, TB: 1024 ** 4, PB: 1024 ** 5 };
+        return (value * (toBytes[from] || 1)) / (toBytes[to] || 1);
+    }
+
+    // ===== NON-LINEAR SOLVER (Newton-Raphson) =====
+    solveEquation(expr, variable = 'x', guess = 0, tolerance = 1e-10, maxIter = 100) {
+        let x = guess;
+        for (let i = 0; i < maxIter; i++) {
+            const f = this.evaluateFunctionAt(expr, variable, x);
+            const h = 0.0001;
+            const fPrime = (this.evaluateFunctionAt(expr, variable, x + h) - f) / h;
+            if (Math.abs(fPrime) < 1e-15) break;
+            const xNew = x - f / fPrime;
+            if (Math.abs(xNew - x) < tolerance) return xNew;
+            x = xNew;
+        }
+        return x;
+    }
+
     // ===== ALGEBRA & EQUATIONS =====
     solveQuadratic(a, b, c) {
         const discriminant = b * b - 4 * a * c;
@@ -586,30 +738,43 @@ class Calculator {
     }
 
     // ===== EVALUATE FUNCTION AT A POINT =====
-    evaluateFunctionAt(expr, variable = 'x', value) {
+    evaluateFunctionAt(expr, variable = 'x', value, yVal = null, zVal = null) {
         try {
-            // Replace variable with value
-            let evalExpr = expr.replace(new RegExp(variable, 'g'), `(${value})`);
+            let evalExpr = expr;
             
-            // Replace constants
+            if (typeof value === 'object') {
+                evalExpr = evalExpr.replace(/\bx\b/g, `(${value[0]})`);
+                evalExpr = evalExpr.replace(/\by\b/g, `(${value[1]})`);
+                evalExpr = evalExpr.replace(/\bz\b/g, `(${value[2]})`);
+            } else {
+                evalExpr = evalExpr.replace(/\bx\b/g, `(${value})`);
+                if (yVal !== null) evalExpr = evalExpr.replace(/\by\b/g, `(${yVal})`);
+                if (zVal !== null) evalExpr = evalExpr.replace(/\bz\b/g, `(${zVal})`);
+            }
+            
             evalExpr = evalExpr.replace(/π|pi/g, String(Math.PI));
             evalExpr = evalExpr.replace(/e(?![a-zA-Z])/g, String(Math.E));
             evalExpr = evalExpr.replace(/φ/g, '1.618033988749895');
             
-            // Replace functions
-            evalExpr = evalExpr.replace(/sin\(/g, '(Math.sin(');
-            evalExpr = evalExpr.replace(/cos\(/g, '(Math.cos(');
-            evalExpr = evalExpr.replace(/tan\(/g, '(Math.tan(');
-            evalExpr = evalExpr.replace(/sqrt\(/g, '(Math.sqrt(');
-            evalExpr = evalExpr.replace(/log\(/g, '(Math.log10(');
-            evalExpr = evalExpr.replace(/ln\(/g, '(Math.log(');
-            evalExpr = evalExpr.replace(/abs\(/g, '(Math.abs(');
+            const funcs = [
+                ['sin', 'Math.sin'], ['cos', 'Math.cos'], ['tan', 'Math.tan'],
+                ['asin', 'Math.asin'], ['acos', 'Math.acos'], ['atan', 'Math.atan'],
+                ['sinh', 'Math.sinh'], ['cosh', 'Math.cosh'], ['tanh', 'Math.tanh'],
+                ['asinh', 'Math.asinh'], ['acosh', 'Math.acosh'], ['atanh', 'Math.atanh'],
+                ['sqrt', 'Math.sqrt'], ['cbrt', 'Math.cbrt'], ['log', 'Math.log10'],
+                ['ln', 'Math.log'], ['abs', 'Math.abs'], ['exp', 'Math.exp'],
+                ['floor', 'Math.floor'], ['ceil', 'Math.ceil'], ['round', 'Math.round'],
+                ['pow', 'Math.pow']
+            ];
+            funcs.forEach(([name, impl]) => {
+                evalExpr = evalExpr.replace(new RegExp(name + '\\(', 'g'), impl + '(');
+            });
             
-            // Fix unmatched parentheses
-            evalExpr += ')'.repeat((evalExpr.match(/\(/g) || []).length - (evalExpr.match(/\)/g) || []).length);
+            let open = (evalExpr.match(/\(/g) || []).length;
+            let close = (evalExpr.match(/\)/g) || []).length;
+            evalExpr += ')'.repeat(open - close);
             
-            const result = Function('"use strict"; return (' + evalExpr + ');')();
-            return result;
+            return Function('"use strict"; return (' + evalExpr + ');')();
         } catch (e) {
             return NaN;
         }
@@ -796,6 +961,8 @@ class Calculator {
             const num = parseFloat(result);
             if (!isNaN(num) && isFinite(num)) this.lastAnswer = num;
             this.history.push(`${this.expression} = ${result}`);
+            this.expressionHistory.push(this.expression);
+            this.historyIndex = -1;
             this.expression = '';
             this.result = result;
             this.updateDisplay();
@@ -890,6 +1057,46 @@ class Calculator {
         // Close modal when clicking outside
         document.getElementById('folderModal').addEventListener('click', (e) => {
             if (e.target.id === 'folderModal') this.closeModal();
+        });
+
+        // Keyboard support for expression history replay
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowUp' && this.expressionHistory.length > 0) {
+                e.preventDefault();
+                if (this.historyIndex < this.expressionHistory.length - 1) {
+                    this.historyIndex++;
+                    this.expression = this.expressionHistory[this.expressionHistory.length - 1 - this.historyIndex];
+                    this.updateDisplay();
+                }
+            } else if (e.key === 'ArrowDown' && this.expressionHistory.length > 0) {
+                e.preventDefault();
+                if (this.historyIndex > 0) {
+                    this.historyIndex--;
+                    this.expression = this.expressionHistory[this.expressionHistory.length - 1 - this.historyIndex];
+                    this.updateDisplay();
+                } else if (this.historyIndex === 0) {
+                    this.historyIndex = -1;
+                    this.expression = '';
+                    this.updateDisplay();
+                }
+            }
+        });
+
+        // Graph mode change
+        document.getElementById('graphMode').addEventListener('change', (e) => {
+            const input2 = document.getElementById('graphInput2');
+            const input1 = document.getElementById('graphInput');
+            if (e.target.value === 'parametric') {
+                input2.style.display = 'block';
+                input1.placeholder = 'x = f(t), e.g., cos(t)';
+                input2.placeholder = 'y = f(t), e.g., sin(t)';
+            } else if (e.target.value === 'polar') {
+                input2.style.display = 'none';
+                input1.placeholder = 'r = f(θ), e.g., 2*cos(θ)';
+            } else {
+                input2.style.display = 'none';
+                input1.placeholder = 'y = f(x), e.g., sin(x)';
+            }
         });
     }
 
@@ -1023,6 +1230,7 @@ class Calculator {
                 { label: 'Quadratic', action: 'showQuadraticSolver' },
                 { label: '2×2 Linear', action: 'showLinear2x2UI' },
                 { label: '3×3 Linear', action: 'showLinear3x3UI' },
+                { label: 'Non-Linear', action: 'showNonLinearSolverUI' },
             ],
             matrix: [
                 { label: 'Det', action: 'showMatrixDetUI' },
@@ -1031,6 +1239,8 @@ class Calculator {
                 { label: 'A+B', action: 'showMatrixAddUI' },
                 { label: 'A−B', action: 'showMatrixSubUI' },
                 { label: 'A×B', action: 'showMatrixMulUI' },
+                { label: 'Save Mat', action: 'showSaveMatrixUI' },
+                { label: 'Load Mat', action: 'showLoadMatrixUI' },
             ],
             constants: [
                 { label: 'π', fn: String(Math.PI) },
@@ -1059,6 +1269,8 @@ class Calculator {
                 { label: 'Angle', action: 'showVectorAngleUI' },
                 { label: 'Polar→Rect', action: 'showPolarToRectUI' },
                 { label: 'Rect→Polar', action: 'showRectToPolarUI' },
+                { label: 'Save Vec', action: 'showSaveVectorUI' },
+                { label: 'Load Vec', action: 'showLoadVectorUI' },
             ],
             units: [
                 { label: 'Length', action: 'showUnitConvertUI("length")' },
@@ -1075,6 +1287,37 @@ class Calculator {
                 { label: 'Bin→Dec', action: 'showBaseConvertUI("bin2dec")' },
                 { label: 'Dec→Hex', action: 'showBaseConvertUI("dec2hex")' },
                 { label: 'Hex→Dec', action: 'showBaseConvertUI("hex2dec")' },
+            ],
+            complex: [
+                { label: 'a+bi Add', action: 'showComplexAddUI' },
+                { label: 'a+bi Sub', action: 'showComplexSubUI' },
+                { label: 'a+bi ×', action: 'showComplexMulUI' },
+                { label: 'a+bi ÷', action: 'showComplexDivUI' },
+                { label: 'Conjugate', action: 'showComplexConjUI' },
+                { label: '|a+bi|', action: 'showComplexMagUI' },
+                { label: 'arg(a+bi)', action: 'showComplexArgUI' },
+                { label: '→Polar', action: 'showComplexToPolarUI' },
+                { label: 'Polar→', action: 'showPolarToComplexUI' },
+            ],
+            finance: [
+                { label: 'Compound', action: 'showCompoundInterestUI' },
+                { label: 'Loan Pmt', action: 'showLoanPaymentUI' },
+                { label: 'Total Pmt', action: 'showTotalLoanUI' },
+                { label: 'Total Int', action: 'showTotalInterestUI' },
+            ],
+            health: [
+                { label: 'BMI', action: 'showBMIUI' },
+                { label: 'BMR', action: 'showBMRUI' },
+                { label: 'TDEE', action: 'showTDEEUI' },
+            ],
+            date: [
+                { label: 'Days Between', action: 'showDaysBetweenUI' },
+                { label: 'Add Days', action: 'showAddDaysUI' },
+                { label: 'Day of Week', action: 'showDayOfWeekUI' },
+                { label: 'Week #', action: 'showWeekNumberUI' },
+            ],
+            data: [
+                { label: 'Data Conv', action: 'showDataConvertUI' },
             ],
         };
 
@@ -1115,12 +1358,15 @@ class Calculator {
                     else if (f.action === 'showQuadraticSolver') this.showQuadraticSolver();
                     else if (f.action === 'showLinear2x2UI') this.showLinear2x2UI();
                     else if (f.action === 'showLinear3x3UI') this.showLinear3x3UI();
+                    else if (f.action === 'showNonLinearSolverUI') this.showNonLinearSolverUI();
                     else if (f.action === 'showMatrixDetUI') this.showMatrixDetUI();
                     else if (f.action === 'showMatrixTransposeUI') this.showMatrixTransposeUI();
                     else if (f.action === 'showMatrixInverseUI') this.showMatrixInverseUI();
                     else if (f.action === 'showMatrixAddUI') this.showMatrixAddUI();
                     else if (f.action === 'showMatrixSubUI') this.showMatrixSubUI();
                     else if (f.action === 'showMatrixMulUI') this.showMatrixMulUI();
+                    else if (f.action === 'showSaveMatrixUI') this.showSaveMatrixUI();
+                    else if (f.action === 'showLoadMatrixUI') this.showLoadMatrixUI();
                     else if (f.action === 'showPolarToRectUI') this.showPolarToRectUI();
                     else if (f.action === 'showRectToPolarUI') this.showRectToPolarUI();
                     else if (f.action === 'showVectorAddUI') this.showVectorAddUI();
@@ -1128,6 +1374,8 @@ class Calculator {
                     else if (f.action === 'showVectorDotUI') this.showVectorDotUI();
                     else if (f.action === 'showVectorMagUI') this.showVectorMagUI();
                     else if (f.action === 'showVectorAngleUI') this.showVectorAngleUI();
+                    else if (f.action === 'showSaveVectorUI') this.showSaveVectorUI();
+                    else if (f.action === 'showLoadVectorUI') this.showLoadVectorUI();
                     else if (f.action === 'showToDMSUI') this.showToDMSUI();
                     else if (f.action === 'showFromDMSUI') this.showFromDMSUI();
                     else if (f.action === 'showDecimalToFracUI') this.showDecimalToFracUI();
@@ -1140,6 +1388,32 @@ class Calculator {
                     else if (f.action === 'showCriticalPointsUI') this.showCriticalPointsUI();
                     else if (f.action === 'showExtremaUI') this.showExtremaUI();
                     else if (f.action === 'showInflectionUI') this.showInflectionUI();
+                    // Complex
+                    else if (f.action === 'showComplexAddUI') this.showComplexAddUI();
+                    else if (f.action === 'showComplexSubUI') this.showComplexSubUI();
+                    else if (f.action === 'showComplexMulUI') this.showComplexMulUI();
+                    else if (f.action === 'showComplexDivUI') this.showComplexDivUI();
+                    else if (f.action === 'showComplexConjUI') this.showComplexConjUI();
+                    else if (f.action === 'showComplexMagUI') this.showComplexMagUI();
+                    else if (f.action === 'showComplexArgUI') this.showComplexArgUI();
+                    else if (f.action === 'showComplexToPolarUI') this.showComplexToPolarUI();
+                    else if (f.action === 'showPolarToComplexUI') this.showPolarToComplexUI();
+                    // Finance
+                    else if (f.action === 'showCompoundInterestUI') this.showCompoundInterestUI();
+                    else if (f.action === 'showLoanPaymentUI') this.showLoanPaymentUI();
+                    else if (f.action === 'showTotalLoanUI') this.showTotalLoanUI();
+                    else if (f.action === 'showTotalInterestUI') this.showTotalInterestUI();
+                    // Health
+                    else if (f.action === 'showBMIUI') this.showBMIUI();
+                    else if (f.action === 'showBMRUI') this.showBMRUI();
+                    else if (f.action === 'showTDEEUI') this.showTDEEUI();
+                    // Date
+                    else if (f.action === 'showDaysBetweenUI') this.showDaysBetweenUI();
+                    else if (f.action === 'showAddDaysUI') this.showAddDaysUI();
+                    else if (f.action === 'showDayOfWeekUI') this.showDayOfWeekUI();
+                    else if (f.action === 'showWeekNumberUI') this.showWeekNumberUI();
+                    // Data
+                    else if (f.action === 'showDataConvertUI') this.showDataConvertUI();
                     else if (f.action.includes('setAngleMode')) eval('this.' + f.action);
                 });
             } else if (f.fn) {
@@ -1392,6 +1666,73 @@ class Calculator {
         else this.expression = 'x = ' + r.map(v => v.toFixed(6)).join(', ');
         this.updateDisplay();
     }
+    solveNonLinear(equations, guesses, tolerance = 1e-10, maxIter = 100) {
+        const n = equations.length;
+        let x = [...guesses];
+        
+        for (let iter = 0; iter < maxIter; iter++) {
+            const f = equations.map(eq => {
+                return this.evaluateFunctionAt(eq, 'x', x[0], x[1], x[2]);
+            });
+            
+            let maxError = Math.max(...f.map(Math.abs));
+            if (maxError < tolerance) {
+                return { solution: x, converged: true, iterations: iter };
+            }
+            
+            const jacobian = [];
+            const h = 0.0001;
+            for (let i = 0; i < n; i++) {
+                const row = [];
+                for (let j = 0; j < n; j++) {
+                    const xPlus = [...x];
+                    xPlus[j] += h;
+                    const f1 = this.evaluateFunctionAt(equations[i], 'x', xPlus[0], xPlus[1], xPlus[2]);
+                    const f0 = this.evaluateFunctionAt(equations[i], 'x', x[0], x[1], x[2]);
+                    row.push((f1 - f0) / h);
+                }
+                jacobian.push(row);
+            }
+            
+            try {
+                const invJ = this.matrixInverse(jacobian);
+                if (!invJ) return { solution: x, converged: false, iterations: iter };
+                
+                for (let i = 0; i < n; i++) {
+                    let delta = 0;
+                    for (let j = 0; j < n; j++) {
+                        delta += invJ[i][j] * f[j];
+                    }
+                    x[i] -= delta;
+                }
+            } catch (e) {
+                return { solution: x, converged: false, iterations: iter };
+            }
+        }
+        return { solution: x, converged: false, iterations: maxIter };
+    }
+    showNonLinearSolverUI() {
+        const numVars = parseInt(prompt('Number of equations (2 or 3):', '2'), 10);
+        if (numVars !== 2 && numVars !== 3) { alert('Only 2 or 3 equations supported'); return; }
+        
+        const equations = [];
+        for (let i = 0; i < numVars; i++) {
+            const eq = prompt(`Equation ${i + 1} (use x, y, z; leave =0 implicit):\nExample: x^2 + y^2 - 4`);
+            if (!eq) return;
+            equations.push(eq.replace(/=.*$/, '').trim());
+        }
+        
+        const guesses = [];
+        if (numVars >= 2) guesses.push(parseFloat(prompt('Initial guess for x:', '1')) || 1);
+        if (numVars >= 2) guesses.push(parseFloat(prompt('Initial guess for y:', '1')) || 1);
+        if (numVars === 3) guesses.push(parseFloat(prompt('Initial guess for z:', '1')) || 1);
+        
+        const result = this.solveNonLinear(equations, guesses);
+        const vars = numVars === 2 ? ['x', 'y'] : ['x', 'y', 'z'];
+        const sol = result.solution.map((v, i) => `${vars[i]} = ${v.toFixed(8)}`).join(', ');
+        this.expression = `Non-linear: ${result.converged ? 'Converged' : 'Did not converge'} (${result.iterations} iter): ${sol}`;
+        this.updateDisplay();
+    }
     parseMatrix2D(str) {
         const rows = str.trim().split(/[;\n]+/);
         return rows.map(row => row.split(/[\s,]+/).map(Number));
@@ -1454,6 +1795,26 @@ class Calculator {
         this.expression = 'A×B = ' + JSON.stringify(r);
         this.updateDisplay();
     }
+    showSaveMatrixUI() {
+        const name = prompt('Enter name for this matrix:');
+        if (!name) return;
+        const s = prompt('Enter matrix (rows separated by ; or newline)\nExample: 1 2 ; 3 4');
+        if (!s) return;
+        const A = this.parseMatrix2D(s);
+        this.matrixStorage[name] = A;
+        this.expression = `Saved matrix ${name} = ${JSON.stringify(A)}`;
+        this.updateDisplay();
+    }
+    showLoadMatrixUI() {
+        const name = prompt('Enter matrix name to load:');
+        if (!name || !this.matrixStorage[name]) {
+            if (name) alert(`Matrix "${name}" not found`);
+            return;
+        }
+        const A = this.matrixStorage[name];
+        this.expression = `${name} = ${JSON.stringify(A)}`;
+        this.updateDisplay();
+    }
     parseVector(str) {
         return str.trim().split(/[\s,]+/).map(Number).filter(n => !isNaN(n));
     }
@@ -1494,6 +1855,25 @@ class Calculator {
         if (isNaN(x) || isNaN(y)) return;
         const [r, theta] = this.rectToPolar(x, y);
         this.expression = 'r = ' + r.toFixed(6) + ', θ = ' + theta.toFixed(6) + '°';
+        this.updateDisplay();
+    }
+    showSaveVectorUI() {
+        const name = prompt('Enter name for this vector:');
+        if (!name) return;
+        const v = this.parseVector(prompt('Enter vector components (e.g. 1 2 or 1,2,3):'));
+        if (v.length === 0) return;
+        this.vectorStorage[name] = v;
+        this.expression = `Saved vector ${name} = [${v.join(', ')}]`;
+        this.updateDisplay();
+    }
+    showLoadVectorUI() {
+        const name = prompt('Enter vector name to load:');
+        if (!name || !this.vectorStorage[name]) {
+            if (name) alert(`Vector "${name}" not found`);
+            return;
+        }
+        const v = this.vectorStorage[name];
+        this.expression = `${name} = [${v.join(', ')}]`;
         this.updateDisplay();
     }
     showVectorAddUI() {
@@ -1561,6 +1941,173 @@ class Calculator {
         else if (kind === 'hex2dec') r = this.hex2dec(s);
         else return;
         this.expression = kind + '(' + s + ') = ' + r;
+        this.updateDisplay();
+    }
+
+    // ===== COMPLEX NUMBERS UI =====
+    showComplexAddUI() {
+        const a = { re: parseFloat(prompt('a (real):')), im: parseFloat(prompt('a (imag):')) };
+        const b = { re: parseFloat(prompt('b (real):')), im: parseFloat(prompt('b (imag):')) };
+        const r = this.complexAdd(a, b);
+        this.expression = `(${a.re}${a.im>=0?'+':''}${a.im}i) + (${b.re}${b.im>=0?'+':''}${b.im}i) = ${r.re.toFixed(4)}${r.im>=0?'+':''}${r.im.toFixed(4)}i`;
+        this.updateDisplay();
+    }
+    showComplexSubUI() {
+        const a = { re: parseFloat(prompt('a (real):')), im: parseFloat(prompt('a (imag):')) };
+        const b = { re: parseFloat(prompt('b (real):')), im: parseFloat(prompt('b (imag):')) };
+        const r = this.complexSub(a, b);
+        this.expression = `(${a.re}${a.im>=0?'+':''}${a.im}i) - (${b.re}${b.im>=0?'+':''}${b.im}i) = ${r.re.toFixed(4)}${r.im>=0?'+':''}${r.im.toFixed(4)}i`;
+        this.updateDisplay();
+    }
+    showComplexMulUI() {
+        const a = { re: parseFloat(prompt('a (real):')), im: parseFloat(prompt('a (imag):')) };
+        const b = { re: parseFloat(prompt('b (real):')), im: parseFloat(prompt('b (imag):')) };
+        const r = this.complexMul(a, b);
+        this.expression = `(${a.re}${a.im>=0?'+':''}${a.im}i) × (${b.re}${b.im>=0?'+':''}${b.im}i) = ${r.re.toFixed(4)}${r.im>=0?'+':''}${r.im.toFixed(4)}i`;
+        this.updateDisplay();
+    }
+    showComplexDivUI() {
+        const a = { re: parseFloat(prompt('a (real):')), im: parseFloat(prompt('a (imag):')) };
+        const b = { re: parseFloat(prompt('b (real):')), im: parseFloat(prompt('b (imag):')) };
+        const r = this.complexDiv(a, b);
+        this.expression = `(${a.re}${a.im>=0?'+':''}${a.im}i) ÷ (${b.re}${b.im>=0?'+':''}${b.im}i) = ${r.re.toFixed(4)}${r.im>=0?'+':''}${r.im.toFixed(4)}i`;
+        this.updateDisplay();
+    }
+    showComplexConjUI() {
+        const a = { re: parseFloat(prompt('a (real):')), im: parseFloat(prompt('a (imag):')) };
+        const r = this.complexConj(a);
+        this.expression = `conj(${a.re}${a.im>=0?'+':''}${a.im}i) = ${r.re.toFixed(4)}${r.im>=0?'+':''}${r.im.toFixed(4)}i`;
+        this.updateDisplay();
+    }
+    showComplexMagUI() {
+        const a = { re: parseFloat(prompt('a (real):')), im: parseFloat(prompt('a (imag):')) };
+        const r = this.complexMag(a);
+        this.expression = `|${a.re}${a.im>=0?'+':''}${a.im}i| = ${r.toFixed(4)}`;
+        this.updateDisplay();
+    }
+    showComplexArgUI() {
+        const a = { re: parseFloat(prompt('a (real):')), im: parseFloat(prompt('a (imag):')) };
+        const r = this.complexArg(a);
+        this.expression = `arg(${a.re}${a.im>=0?'+':''}${a.im}i) = ${r.toFixed(4)}°`;
+        this.updateDisplay();
+    }
+    showComplexToPolarUI() {
+        const a = { re: parseFloat(prompt('a (real):')), im: parseFloat(prompt('a (imag):')) };
+        const r = this.complexToPolar(a);
+        this.expression = `${a.re}${a.im>=0?'+':''}${a.im}i → (${r.r.toFixed(4)}, ${r.theta.toFixed(4)}°)`;
+        this.updateDisplay();
+    }
+    showPolarToComplexUI() {
+        const r = parseFloat(prompt('r (magnitude):'));
+        const theta = parseFloat(prompt('θ (degrees):'));
+        const a = this.polarToComplex(r, theta);
+        this.expression = `(${r}, ${theta}°) → ${a.re.toFixed(4)}${a.im>=0?'+':''}${a.im.toFixed(4)}i`;
+        this.updateDisplay();
+    }
+
+    // ===== FINANCE UI =====
+    showCompoundInterestUI() {
+        const p = parseFloat(prompt('Principal:'));
+        const r = parseFloat(prompt('Annual rate (as decimal, e.g. 0.05 for 5%):'));
+        const n = parseFloat(prompt('Compounds per year:'));
+        const t = parseFloat(prompt('Years:'));
+        const result = this.compoundInterest(p, r, n, t);
+        this.expression = `Compound Interest: P=${p}, r=${r}, n=${n}, t=${t} → A=${result.toFixed(2)}`;
+        this.updateDisplay();
+    }
+    showLoanPaymentUI() {
+        const p = parseFloat(prompt('Loan amount:'));
+        const r = parseFloat(prompt('Annual interest rate (decimal):'));
+        const y = parseFloat(prompt('Years:'));
+        const n = parseFloat(prompt('Payments per year (12=monthly):'));
+        const result = this.loanPayment(p, r, y, n);
+        this.expression = `Monthly payment: $${result.toFixed(2)}`;
+        this.updateDisplay();
+    }
+    showTotalLoanUI() {
+        const p = parseFloat(prompt('Loan amount:'));
+        const r = parseFloat(prompt('Annual interest rate (decimal):'));
+        const y = parseFloat(prompt('Years:'));
+        const n = parseFloat(prompt('Payments per year:'));
+        const result = this.totalLoanPayment(p, r, y, n);
+        this.expression = `Total payment: $${result.toFixed(2)}`;
+        this.updateDisplay();
+    }
+    showTotalInterestUI() {
+        const p = parseFloat(prompt('Loan amount:'));
+        const r = parseFloat(prompt('Annual interest rate (decimal):'));
+        const y = parseFloat(prompt('Years:'));
+        const n = parseFloat(prompt('Payments per year:'));
+        const result = this.totalInterest(p, r, y, n);
+        this.expression = `Total interest: $${result.toFixed(2)}`;
+        this.updateDisplay();
+    }
+
+    // ===== HEALTH UI =====
+    showBMIUI() {
+        const w = parseFloat(prompt('Weight (kg):'));
+        const h = parseFloat(prompt('Height (cm):'));
+        const bmi = this.calculateBMI(w, h);
+        const cat = this.bmiCategory(bmi);
+        this.expression = `BMI = ${bmi.toFixed(1)} (${cat})`;
+        this.updateDisplay();
+    }
+    showBMRUI() {
+        const w = parseFloat(prompt('Weight (kg):'));
+        const h = parseFloat(prompt('Height (cm):'));
+        const age = parseFloat(prompt('Age:'));
+        const isMale = confirm('Male? OK for male, Cancel for female');
+        const bmr = this.calculateBMR(w, h, age, isMale);
+        this.expression = `BMR = ${bmr.toFixed(0)} kcal/day`;
+        this.updateDisplay();
+    }
+    showTDEEUI() {
+        const w = parseFloat(prompt('Weight (kg):'));
+        const h = parseFloat(prompt('Height (cm):'));
+        const age = parseFloat(prompt('Age:'));
+        const isMale = confirm('Male? OK for male, Cancel for female');
+        const act = prompt('Activity (sedentary/light/moderate/active/veryActive):');
+        const bmr = this.calculateBMR(w, h, age, isMale);
+        const tdee = this.tdee(bmr, act);
+        this.expression = `TDEE = ${tdee.toFixed(0)} kcal/day`;
+        this.updateDisplay();
+    }
+
+    // ===== DATE UI =====
+    showDaysBetweenUI() {
+        const d1 = prompt('Start date (YYYY-MM-DD):');
+        const d2 = prompt('End date (YYYY-MM-DD):');
+        const result = this.daysBetween(d1, d2);
+        this.expression = `Days between: ${result}`;
+        this.updateDisplay();
+    }
+    showAddDaysUI() {
+        const d = prompt('Start date (YYYY-MM-DD):');
+        const days = parseFloat(prompt('Days to add:'));
+        const result = this.addDays(d, days);
+        this.expression = `${d} + ${days} days = ${result}`;
+        this.updateDisplay();
+    }
+    showDayOfWeekUI() {
+        const d = prompt('Date (YYYY-MM-DD):');
+        const result = this.dayOfWeek(d);
+        this.expression = `${d} is ${result}`;
+        this.updateDisplay();
+    }
+    showWeekNumberUI() {
+        const d = prompt('Date (YYYY-MM-DD):');
+        const result = this.weekNumber(d);
+        this.expression = `Week number: ${result}`;
+        this.updateDisplay();
+    }
+
+    // ===== DATA CONVERTER UI =====
+    showDataConvertUI() {
+        const val = parseFloat(prompt('Value:'));
+        const from = prompt('From unit (B, KB, MB, GB, TB, PB):').toUpperCase();
+        const to = prompt('To unit:').toUpperCase();
+        const result = this.dataConvert(val, from, to);
+        this.expression = val + ' ' + from + ' = ' + result.toFixed(6) + ' ' + to;
         this.updateDisplay();
     }
 }

@@ -680,6 +680,15 @@ a.tool-tile .tile-core{
   cursor: pointer;
 }
 
+.style-section-title {
+  color: #666;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  margin: 10px 0 5px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid #333;
+}
+
 .style-actions {
   display: flex;
   flex-direction: column;
@@ -721,6 +730,119 @@ a.tool-tile .tile-core{
 .mm-node.shape-hexagon {
   clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
   padding: 20px 30px;
+}
+
+.mm-node.shape-cloud {
+  border-radius: 30px 30px 30px 30px / 40px 40px 30px 30px;
+}
+
+.mm-node-text {
+  display: inline-block;
+}
+
+.mm-node-controls {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.mm-node.show-controls .mm-node-controls {
+  opacity: 1;
+}
+
+.mm-control-btn {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  background: #6366f1;
+  color: #fff;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  transition: transform 0.15s, background 0.15s;
+}
+
+.mm-control-btn:hover {
+  transform: scale(1.2);
+  background: #818cf8;
+}
+
+.mm-control-btn.top {
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.mm-control-btn.right {
+  right: -12px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.mm-control-btn.bottom {
+  bottom: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.mm-control-btn.left {
+  left: -12px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.mm-node.show-controls .mm-control-btn.top {
+  transform: translateX(-50%);
+}
+
+.mm-node.show-controls .mm-control-btn.top:hover {
+  transform: translateX(-50%) scale(1.2);
+}
+
+.mm-node.show-controls .mm-control-btn.right {
+  transform: translateY(-50%);
+}
+
+.mm-node.show-controls .mm-control-btn.right:hover {
+  transform: translateY(-50%) scale(1.2);
+}
+
+.mm-node.show-controls .mm-control-btn.bottom {
+  transform: translateX(-50%);
+}
+
+.mm-node.show-controls .mm-control-btn.bottom:hover {
+  transform: translateX(-50%) scale(1.2);
+}
+
+.mm-node.show-controls .mm-control-btn.left {
+  transform: translateY(-50%);
+}
+
+.mm-node.show-controls .mm-control-btn.left:hover {
+  transform: translateY(-50%) scale(1.2);
+}
+
+.mm-control-btn.style {
+  top: -12px;
+  right: -12px;
+  background: #f59e0b;
+}
+
+.mm-control-btn.style:hover {
+  background: #fbbf24;
 }
 
 .modal-header {

@@ -15,17 +15,25 @@ let notebooks = [];
 let currentNotebookId = null;
 let notes = [];
 let currentNoteId = null;
+let unsavedChanges = false;
+let lastSavedContent = '';
 
 // Initialize Quill Editor
 const quill = new Quill('#quill-editor', {
     theme: 'snow',
     modules: {
         toolbar: [
-            [{ header: [1, 2, 3, false] }],
+            [{ header: [1, 2, 3, 4, 5, 6, false] }],
             ['bold', 'italic', 'underline', 'strike'],
-            [{ list: 'ordered' }, { list: 'bullet' }],
-            ['blockquote', 'code-block'],
             [{ color: [] }, { background: [] }],
+            [{ script: 'sub' }, { script: 'super' }],
+            [{ list: 'ordered' }, { list: 'bullet' }, { list: 'check' }],
+            [{ indent: '-1' }, { indent: '+1' }],
+            ['blockquote', 'code-block'],
+            [{ align: [] }],
+            ['link', 'image', 'video'],
+            ['table'],
+            [{ font: [] }, { size: ['small', false, 'large', 'huge'] }],
             ['clean']
         ]
     }
@@ -46,7 +54,13 @@ const exportWordBtn = document.getElementById('export-word-btn');
 const saveIndicator = document.getElementById('save-indicator');
 
 // Event Listeners
-notebookSelect.addEventListener('change', (e) => loadNotes(e.target.value));
+notebookSelect.addEventListener('change', (e) => {
+    if (unsavedChanges && !checkUnsavedAndContinue()) {
+        notebookSelect.value = currentNotebookId;
+        return;
+    }
+    loadNotes(e.target.value);
+});
 newNotebookBtn.addEventListener('click', createNotebook);
 delNotebookBtn.addEventListener('click', deleteNotebook);
 newNoteBtn.addEventListener('click', createNewNote);
@@ -60,19 +74,42 @@ let typingTimer;
 quill.on('text-change', () => {
     clearTimeout(typingTimer);
     if(currentNoteId) {
+        unsavedChanges = true;
         typingTimer = setTimeout(saveNote, 2000);
     }
 });
 
 noteTitleInput.addEventListener('input', () => {
     clearTimeout(typingTimer);
-    if(currentNoteId) typingTimer = setTimeout(saveNote, 2000);
+    if(currentNoteId) {
+        unsavedChanges = true;
+        typingTimer = setTimeout(saveNote, 2000);
+    }
 });
 
 noteSectionInput.addEventListener('input', () => {
     clearTimeout(typingTimer);
-    if(currentNoteId) typingTimer = setTimeout(saveNote, 2000);
+    if(currentNoteId) {
+        unsavedChanges = true;
+        typingTimer = setTimeout(saveNote, 2000);
+    }
 });
+
+// Unsaved changes warning
+window.addEventListener('beforeunload', (e) => {
+    if (unsavedChanges) {
+        e.preventDefault();
+        e.returnValue = '';
+    }
+});
+
+function checkUnsavedAndContinue(callback) {
+    if (unsavedChanges) {
+        const proceed = confirm('You have unsaved changes. Do you want to discard them?');
+        if (!proceed) return false;
+    }
+    return true;
+}
 
 // Init
 document.addEventListener('DOMContentLoaded', loadNotebooks);
@@ -212,6 +249,8 @@ function renderNotesList() {
 }
 
 function selectNote(id) {
+    if (unsavedChanges && !checkUnsavedAndContinue()) return;
+    
     currentNoteId = id;
     const note = notes.find(n => n.id === currentNoteId);
     if (!note) return;
@@ -219,10 +258,14 @@ function selectNote(id) {
     noteTitleInput.value = note.title || '';
     noteSectionInput.value = note.section || '';
     quill.root.innerHTML = note.content || '';
+    
+    // Reset unsaved state
+    unsavedChanges = false;
+    lastSavedContent = note.content || '';
 
     // Update active class in list
     document.querySelectorAll('.note-item').forEach(el => el.classList.remove('active'));
-    renderNotesList(); // Simple way to refresh active state
+    renderNotesList();
 }
 
 function clearEditor() {
@@ -230,6 +273,8 @@ function clearEditor() {
     noteTitleInput.value = '';
     noteSectionInput.value = '';
     quill.root.innerHTML = '';
+    unsavedChanges = false;
+    lastSavedContent = '';
 }
 
 async function createNewNote() {
@@ -295,6 +340,10 @@ async function saveNote() {
                 notes[noteIndex].updated_at = new Date().toISOString();
                 renderNotesList();
             }
+
+            // Mark as saved
+            unsavedChanges = false;
+            lastSavedContent = content;
 
             // Show indicator
             saveIndicator.classList.add('active');

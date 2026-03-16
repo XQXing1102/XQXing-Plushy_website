@@ -616,6 +616,11 @@
                     <button class="function-tab" data-tab="vectors">Vectors</button>
                     <button class="function-tab" data-tab="units">Units</button>
                     <button class="function-tab" data-tab="logic">Logic/Base</button>
+                    <button class="function-tab" data-tab="complex">Complex</button>
+                    <button class="function-tab" data-tab="finance">Finance</button>
+                    <button class="function-tab" data-tab="health">Health</button>
+                    <button class="function-tab" data-tab="date">Date</button>
+                    <button class="function-tab" data-tab="data">Data</button>
                 </div>
             </div>
 
@@ -643,8 +648,15 @@
                 </div>
 
                 <div class="graph-input-group">
+                    <select id="graphMode" style="padding: 8px; border-radius: 6px; background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.2);">
+                        <option value="cartesian">y = f(x)</option>
+                        <option value="parametric">Parametric</option>
+                        <option value="polar">Polar r(θ)</option>
+                    </select>
                     <input type="text" class="graph-input" id="graphInput"
-                        placeholder="e.g., y=x^2, y=sin(x), x^2+y^2=25, y=1/(x-2)">
+                        placeholder="y = f(x) or x,y = f(t),θ">
+                    <input type="text" class="graph-input" id="graphInput2"
+                        placeholder="(for parametric: y(t) or θ)" style="display:none;">
                     <input type="text" class="graph-input" id="graphColor" placeholder="Color #FF0000"
                         style="width: 120px;">
                     <button class="graph-btn" onclick="addGraphEquation()">Plot</button>
