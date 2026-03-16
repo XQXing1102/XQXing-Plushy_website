@@ -86,7 +86,7 @@ export default {
       }, null);
 
       if (status > 300) {
-        return jsonResponse({ message: "Username or email exists" }, 400);
+        return jsonResponse({ message: "Error: " + JSON.stringify(data) }, 400);
       }
 
       // Create default folder
