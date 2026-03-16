@@ -1,5 +1,5 @@
 // API configuration
-const API_URL = 'https://xqpl-tool.guoharry267.workers.dev';
+const API_URL = 'https://xqpltool.guoharry267.workers.dev';
 const token = localStorage.getItem('token');
 
 // ===== HTML ESCAPE TO PREVENT XSS =====
