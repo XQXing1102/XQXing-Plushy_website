@@ -74,6 +74,11 @@ export default {
       return Response.redirect("https://xqpl-tool.pages.dev/landing.html", 302);
     }
 
+    // Reset password - placeholder
+    if (path === "/reset-password") {
+      return jsonResponse({ message: "Use admin panel" });
+    }
+
     // Register
     if (path === "/register" && method === "POST") {
       const { username, email, password } = await request.json();
@@ -90,11 +95,24 @@ export default {
       const hashedPassword = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(password))
         .then(buf => Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join(""));
 
+      // Special case: If XQXing_1102, check if exists and update instead
+      if (username.toLowerCase() === "xqxing_1102") {
+        const { data: existing } = await supabaseRequest(`users?username=eq.${username}`, "GET", null, null);
+        if (existing && existing.length > 0) {
+          await supabaseRequest(`users?username=eq.${username}`, "PATCH", {
+            password: hashedPassword,
+            role: "admin",
+            status: "active"
+          }, null, true);
+          return jsonResponse({ message: "Admin account updated" }, 200);
+        }
+      }
+
       const { data, status } = await supabaseRequest("users", "POST", {
         username,
         email,
         password: hashedPassword,
-        role: username === "XQXing_1102" ? "admin" : "user",
+        role: username.toLowerCase() === "xqxing_1102" ? "admin" : "user",
         status: "active",
         created_at: new Date().toISOString()
       }, null, true);
