@@ -558,6 +558,80 @@ export default {
       return jsonResponse({ message: "Deleted" });
     }
 
+    // ============= URL SHORTENER ROUTES =============
+    
+    // Public redirect endpoint (NO AUTH REQUIRED)
+    if (path.startsWith("/s/") && method === "GET") {
+      const alias = path.split("/s/")[1];
+      const { data } = await supabaseRequest(`short_urls?alias=eq.${alias}`, "GET", null, null, true);
+      
+      if (!data || data.length === 0) {
+        return jsonResponse({ message: "Short URL not found" }, 404);
+      }
+      
+      const urlData = data[0];
+      
+      // Increment click count
+      const newClicks = (urlData.clicks || 0) + 1;
+      await supabaseRequest(`short_urls?alias=eq.${alias}`, "PATCH", { clicks: newClicks }, null, true);
+      
+      // Redirect to original URL
+      return Response.redirect(urlData.original_url, 302);
+    }
+
+    // Get all short URLs (protected)
+    if (path === "/short-urls" && method === "GET") {
+      const { data } = await supabaseRequest(`short_urls?user_id=eq.${userId}&order=created_at.desc`, "GET", null, userId);
+      return jsonResponse(data);
+    }
+
+    // Create short URL (protected)
+    if (path === "/short-urls" && method === "POST") {
+      const body = await request.json();
+      const { original_url, alias, title } = body;
+      
+      if (!original_url || !alias) {
+        return jsonResponse({ message: "Missing URL or alias" }, 400);
+      }
+      
+      // Check if alias exists
+      const { data: existing } = await supabaseRequest(`short_urls?alias=eq.${alias}`, "GET", null, null, true);
+      if (existing && existing.length > 0) {
+        return jsonResponse({ message: "Alias already exists" }, 400);
+      }
+      
+      // Create short URL
+      const baseUrl = new URL(request.url).origin;
+      const shortUrl = `${baseUrl}/s/${alias}`;
+      
+      const { data, status } = await supabaseRequest("short_urls", "POST", {
+        user_id: userId,
+        original_url,
+        alias,
+        short_url: shortUrl,
+        title: title || "Untitled",
+        clicks: 0,
+        created_at: new Date().toISOString()
+      }, userId);
+      
+      if (status > 300) {
+        return jsonResponse({ message: "Error creating short URL" }, 400);
+      }
+      
+      return jsonResponse({ 
+        message: "Created", 
+        short_url: shortUrl, 
+        id: data[0].id 
+      }, 201);
+    }
+
+    // Delete short URL (protected)
+    if (path.startsWith("/short-urls/") && method === "DELETE") {
+      const urlId = path.split("/")[2];
+      await supabaseRequest(`short_urls?id=eq.${urlId}&user_id=eq.${userId}`, "DELETE", null, userId);
+      return jsonResponse({ message: "Deleted" });
+    }
+
     return jsonResponse({ message: "Not found" }, 404);
   }
 }

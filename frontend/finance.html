@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Finance Tools - XQXing-Plushy</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/finance.css">
+</head>
+<body>
+
+<div class="dashboard-container">
+  
+  <header class="global-glass-header">
+    <button class="back-btn" onclick="window.location.href='index.html'">← Back</button>
+    <div class="header-center">
+      <h2>💰 Finance Tools</h2>
+      <p>Manage your money wisely</p>
+    </div>
+    <div class="header-right"></div>
+  </header>
+
+  <main class="finance-main">
+    
+    <!-- Tool Selector -->
+    <div class="tool-selector">
+      <button class="tool-tab active" data-tool="tip">💵 Tip Calculator</button>
+      <button class="tool-tab" data-tool="loan">🏦 Loan Calculator</button>
+      <button class="tool-tab" data-tool="currency">💱 Currency Converter</button>
+      <button class="tool-tab" data-tool="budget">📊 Budget Tracker</button>
+      <button class="tool-tab" data-tool="compound">📈 Compound Interest</button>
+    </div>
+
+    <!-- Tip Calculator -->
+    <div class="tool-panel active" id="tip-panel">
+      <div class="tool-card">
+        <h3>💵 Tip Calculator</h3>
+        <div class="input-group">
+          <label>Bill Amount ($)</label>
+          <input type="number" id="tip-bill" placeholder="0.00" step="0.01" min="0">
+        </div>
+        <div class="input-group">
+          <label>Tip Percentage (%)</label>
+          <input type="number" id="tip-percent" placeholder="15" value="15" step="1" min="0" max="100">
+          <div class="tip-presets">
+            <button onclick="setTip(10)">10%</button>
+            <button onclick="setTip(15)">15%</button>
+            <button onclick="setTip(18)">18%</button>
+            <button onclick="setTip(20)">20%</button>
+            <button onclick="setTip(25)">25%</button>
+          </div>
+        </div>
+        <div class="input-group">
+          <label>Number of People</label>
+          <input type="number" id="tip-people" placeholder="1" value="1" step="1" min="1">
+        </div>
+        <button class="calc-btn" onclick="calculateTip()">Calculate</button>
+        <div class="result-box" id="tip-result"></div>
+      </div>
+    </div>
+
+    <!-- Loan Calculator -->
+    <div class="tool-panel" id="loan-panel">
+      <div class="tool-card">
+        <h3>🏦 Loan Calculator</h3>
+        <div class="input-group">
+          <label>Loan Amount ($)</label>
+          <input type="number" id="loan-amount" placeholder="10000" step="100" min="0">
+        </div>
+        <div class="input-group">
+          <label>Annual Interest Rate (%)</label>
+          <input type="number" id="loan-rate" placeholder="5.5" step="0.1" min="0">
+        </div>
+        <div class="input-group">
+          <label>Loan Term (Years)</label>
+          <input type="number" id="loan-years" placeholder="5" step="1" min="1">
+        </div>
+        <button class="calc-btn" onclick="calculateLoan()">Calculate</button>
+        <div class="result-box" id="loan-result"></div>
+      </div>
+    </div>
+
+    <!-- Currency Converter -->
+    <div class="tool-panel" id="currency-panel">
+      <div class="tool-card">
+        <h3>💱 Currency Converter</h3>
+        <div class="input-group">
+          <label>Amount</label>
+          <input type="number" id="currency-amount" placeholder="100" step="0.01" min="0">
+        </div>
+        <div class="input-group">
+          <label>From</label>
+          <select id="currency-from">
+            <option value="USD">USD - US Dollar</option>
+            <option value="EUR">EUR - Euro</option>
+            <option value="GBP">GBP - British Pound</option>
+            <option value="JPY">JPY - Japanese Yen</option>
+            <option value="CNY">CNY - Chinese Yuan</option>
+            <option value="AUD">AUD - Australian Dollar</option>
+            <option value="CAD">CAD - Canadian Dollar</option>
+            <option value="CHF">CHF - Swiss Franc</option>
+            <option value="HKD">HKD - Hong Kong Dollar</option>
+            <option value="SGD">SGD - Singapore Dollar</option>
+          </select>
+        </div>
+        <div class="input-group">
+          <label>To</label>
+          <select id="currency-to">
+            <option value="USD">USD - US Dollar</option>
+            <option value="EUR">EUR - Euro</option>
+            <option value="GBP">GBP - British Pound</option>
+            <option value="JPY">JPY - Japanese Yen</option>
+            <option value="CNY">CNY - Chinese Yuan</option>
+            <option value="AUD">AUD - Australian Dollar</option>
+            <option value="CAD">CAD - Canadian Dollar</option>
+            <option value="CHF">CHF - Swiss Franc</option>
+            <option value="HKD" selected>HKD - Hong Kong Dollar</option>
+            <option value="SGD">SGD - Singapore Dollar</option>
+          </select>
+        </div>
+        <button class="calc-btn" onclick="convertCurrency()">Convert</button>
+        <div class="result-box" id="currency-result"></div>
+        <div class="currency-note">💡 Using live exchange rates from exchangerate-api.com</div>
+      </div>
+    </div>
+
+    <!-- Budget Tracker -->
+    <div class="tool-panel" id="budget-panel">
+      <div class="tool-card">
+        <h3>📊 Budget Tracker</h3>
+        <div class="budget-summary" id="budget-summary">
+          <div class="budget-stat">
+            <span class="stat-label">Monthly Income</span>
+            <span class="stat-value income" id="total-income">$0.00</span>
+          </div>
+          <div class="budget-stat">
+            <span class="stat-label">Total Expenses</span>
+            <span class="stat-value expense" id="total-expenses">$0.00</span>
+          </div>
+          <div class="budget-stat">
+            <span class="stat-label">Remaining</span>
+            <span class="stat-value" id="remaining">$0.00</span>
+          </div>
+        </div>
+        
+        <div class="budget-input-section">
+          <h4>Set Monthly Income</h4>
+          <div class="input-group">
+            <input type="number" id="monthly-income" placeholder="5000" step="0.01" min="0">
+            <button class="calc-btn" onclick="setIncome()">Set Income</button>
+          </div>
+        </div>
+
+        <div class="budget-input-section">
+          <h4>Add Expense</h4>
+          <div class="input-group">
+            <input type="text" id="expense-name" placeholder="Expense name">
+          </div>
+          <div class="input-group">
+            <input type="number" id="expense-amount" placeholder="Amount" step="0.01" min="0">
+          </div>
+          <div class="input-group">
+            <select id="expense-category">
+              <option value="Housing">🏠 Housing</option>
+              <option value="Food">🍔 Food</option>
+              <option value="Transportation">🚗 Transportation</option>
+              <option value="Entertainment">🎮 Entertainment</option>
+              <option value="Healthcare">⚕️ Healthcare</option>
+              <option value="Shopping">🛍️ Shopping</option>
+              <option value="Other">📦 Other</option>
+            </select>
+          </div>
+          <button class="calc-btn" onclick="addExpense()">Add Expense</button>
+        </div>
+
+        <div class="expenses-list" id="expenses-list"></div>
+      </div>
+    </div>
+
+    <!-- Compound Interest Calculator -->
+    <div class="tool-panel" id="compound-panel">
+      <div class="tool-card">
+        <h3>📈 Compound Interest Calculator</h3>
+        <div class="input-group">
+          <label>Initial Investment ($)</label>
+          <input type="number" id="compound-principal" placeholder="1000" step="100" min="0">
+        </div>
+        <div class="input-group">
+          <label>Monthly Contribution ($)</label>
+          <input type="number" id="compound-monthly" placeholder="100" step="10" min="0">
+        </div>
+        <div class="input-group">
+          <label>Annual Interest Rate (%)</label>
+          <input type="number" id="compound-rate" placeholder="7" step="0.1" min="0">
+        </div>
+        <div class="input-group">
+          <label>Time Period (Years)</label>
+          <input type="number" id="compound-years" placeholder="10" step="1" min="1">
+        </div>
+        <div class="input-group">
+          <label>Compound Frequency</label>
+          <select id="compound-frequency">
+            <option value="1">Annually</option>
+            <option value="2">Semi-annually</option>
+            <option value="4">Quarterly</option>
+            <option value="12" selected>Monthly</option>
+            <option value="365">Daily</option>
+          </select>
+        </div>
+        <button class="calc-btn" onclick="calculateCompound()">Calculate</button>
+        <div class="result-box" id="compound-result"></div>
+      </div>
+    </div>
+
+  </main>
+
+</div>
+
+<script src="auth/auth.js"></script>
+<script src="js/finance.js"></script>
+<script>
+  if (!isLoggedIn()) {
+    window.location.href = "auth/login.html";
+  }
+</script>
+</body>
+</html>
