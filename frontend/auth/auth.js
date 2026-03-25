@@ -128,7 +128,12 @@ function logout() {
 
 function redirectIfNotLoggedIn() {
   if (!isLoggedIn()) {
-    window.location.href = "../auth/login.html";
+    // Check if we're in the auth folder
+    if (window.location.pathname.includes("/auth/")) {
+      window.location.href = "./login.html";
+    } else {
+      window.location.href = "auth/login.html";
+    }
   }
 }
 
@@ -148,8 +153,6 @@ document.addEventListener("DOMContentLoaded", () => {
     redirectIfLoggedIn();
   }
 
-  if (window.location.pathname.includes("index.html")) {
-    redirectIfNotLoggedIn();
-    loadUsername();
-  }
+  // Don't auto-redirect on DOMContentLoaded - let each page handle its own auth check
+  // This prevents issues with pages that have inline auth checks
 });
