@@ -172,8 +172,8 @@ class Calculator {
         if (!folder) return;
 
         this.clearGraph();
-        folder.graphs.forEach(graph => {
-            const graphId = 'graph_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        folder.graphs.forEach((graph, index) => {
+            const graphId = 'graph_' + Date.now() + '_' + index + '_' + Math.random().toString(36).substr(2, 9);
             this.desmos.setExpression({
                 id: graphId,
                 latex: graph.latex,
@@ -205,8 +205,8 @@ class Calculator {
 
     setDisplayMode(mode) {
         this.displayMode = mode;
-        document.querySelectorAll('[id$="Mode"][data-display]').forEach(btn => btn.classList.remove('active'));
-        document.querySelector(`[data-display="${mode}"]`).classList.add('active');
+        // Display mode buttons don't exist in UI, just update internal state
+        this.updateDisplay();
     }
 
     // ===== ANGLE CONVERSIONS =====
@@ -389,9 +389,18 @@ class Calculator {
     }
 
     // ===== BASE CONVERSION & BOOLEAN =====
-    dec2bin(n) { return (n >>> 0).toString(2); }
-    dec2oct(n) { return (n >>> 0).toString(8); }
-    dec2hex(n) { return (n >>> 0).toString(16).toUpperCase(); }
+    dec2bin(n) { 
+        if (n < 0) return '-' + ((-n) >>> 0).toString(2);
+        return (n >>> 0).toString(2); 
+    }
+    dec2oct(n) { 
+        if (n < 0) return '-' + ((-n) >>> 0).toString(8);
+        return (n >>> 0).toString(8); 
+    }
+    dec2hex(n) { 
+        if (n < 0) return '-' + ((-n) >>> 0).toString(16).toUpperCase();
+        return (n >>> 0).toString(16).toUpperCase(); 
+    }
     bin2dec(s) { return parseInt(String(s).replace(/^0b/, ''), 2); }
     oct2dec(s) { return parseInt(String(s).replace(/^0o/, ''), 8); }
     hex2dec(s) { return parseInt(String(s).replace(/^0x/, ''), 16); }
@@ -439,20 +448,37 @@ class Calculator {
     daysBetween(date1, date2) {
         const d1 = new Date(date1);
         const d2 = new Date(date2);
+        if (isNaN(d1.getTime()) || isNaN(d2.getTime())) {
+            alert('Invalid date format. Use YYYY-MM-DD');
+            return NaN;
+        }
         const diff = Math.abs(d2 - d1);
         return Math.ceil(diff / (1000 * 60 * 60 * 24));
     }
     addDays(date, days) {
         const result = new Date(date);
+        if (isNaN(result.getTime())) {
+            alert('Invalid date format. Use YYYY-MM-DD');
+            return 'Invalid Date';
+        }
         result.setDate(result.getDate() + days);
         return result.toISOString().split('T')[0];
     }
     dayOfWeek(date) {
+        const d = new Date(date);
+        if (isNaN(d.getTime())) {
+            alert('Invalid date format. Use YYYY-MM-DD');
+            return 'Invalid Date';
+        }
         const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-        return days[new Date(date).getDay()];
+        return days[d.getDay()];
     }
     weekNumber(date) {
         const d = new Date(date);
+        if (isNaN(d.getTime())) {
+            alert('Invalid date format. Use YYYY-MM-DD');
+            return NaN;
+        }
         d.setHours(0, 0, 0, 0);
         d.setDate(d.getDate() + 4 - (d.getDay() || 7));
         const yearStart = new Date(d.getFullYear(), 0, 1);
@@ -580,23 +606,38 @@ class Calculator {
 
     // ===== VECTORS =====
     vectorAdd(a, b) { 
-        if (!a || !b || a.length === 0 || b.length === 0) return [];
+        if (!a || !b || a.length === 0 || b.length === 0) {
+            alert('Invalid vector input');
+            return null;
+        }
         return a.map((v, i) => v + (b[i] || 0)); 
     }
     vectorSub(a, b) { 
-        if (!a || !b || a.length === 0 || b.length === 0) return [];
+        if (!a || !b || a.length === 0 || b.length === 0) {
+            alert('Invalid vector input');
+            return null;
+        }
         return a.map((v, i) => v - (b[i] || 0)); 
     }
     vectorDot(a, b) { 
-        if (!a || !b || a.length === 0 || b.length === 0) return 0;
+        if (!a || !b || a.length === 0 || b.length === 0) {
+            alert('Invalid vector input');
+            return NaN;
+        }
         return a.reduce((s, v, i) => s + v * (b[i] || 0), 0); 
     }
     vectorMag(v) { 
-        if (!v || v.length === 0) return 0;
+        if (!v || v.length === 0) {
+            alert('Invalid vector input');
+            return NaN;
+        }
         return Math.sqrt(v.reduce((s, x) => s + x * x, 0)); 
     }
     vectorScale(v, k) { 
-        if (!v || v.length === 0) return [];
+        if (!v || v.length === 0) {
+            alert('Invalid vector input');
+            return null;
+        }
         return v.map(x => x * k); 
     }
     angleBetweenVectors(a, b) {
@@ -798,19 +839,25 @@ class Calculator {
 
     // ===== MATRIX OPERATIONS =====
     matrixAdd(A, B) {
-        if (!A || !B || A.length === 0 || B.length === 0 || !A[0] || !B[0]) return [];
+        if (!A || !B || A.length === 0 || B.length === 0 || !A[0] || !B[0]) {
+            alert('Invalid matrix input');
+            return null;
+        }
         if (A.length !== B.length || A[0].length !== B[0].length) {
             alert('Matrices must have the same dimensions');
-            return [];
+            return null;
         }
         return A.map((row, i) => row.map((val, j) => val + (B[i] ? B[i][j] : 0)));
     }
 
     matrixMultiply(A, B) {
-        if (!A || !B || A.length === 0 || B.length === 0 || !A[0] || !B[0]) return [];
+        if (!A || !B || A.length === 0 || B.length === 0 || !A[0] || !B[0]) {
+            alert('Invalid matrix input');
+            return null;
+        }
         if (A[0].length !== B.length) {
-            alert('Matrix dimensions incompatible for multiplication');
-            return [];
+            alert('Matrix dimensions incompatible for multiplication. A columns must equal B rows.');
+            return null;
         }
         const result = [];
         for (let i = 0; i < A.length; i++) {
@@ -874,10 +921,13 @@ class Calculator {
     }
 
     matrixSubtract(A, B) {
-        if (!A || !B || A.length === 0 || B.length === 0 || !A[0] || !B[0]) return [];
+        if (!A || !B || A.length === 0 || B.length === 0 || !A[0] || !B[0]) {
+            alert('Invalid matrix input');
+            return null;
+        }
         if (A.length !== B.length || A[0].length !== B[0].length) {
             alert('Matrices must have the same dimensions');
-            return [];
+            return null;
         }
         return A.map((row, i) => row.map((val, j) => val - (B[i] ? B[i][j] : 0)));
     }
@@ -901,12 +951,18 @@ class Calculator {
 
     // ===== PARENTHESES CHECK =====
     checkParentheses(expr) {
-        let depth = 0;
+        let depth = 0, squareDepth = 0, curlyDepth = 0;
         for (const c of expr) {
             if (c === '(') depth++;
             else if (c === ')') { depth--; if (depth < 0) return { ok: false, msg: 'Extra closing parenthesis' }; }
+            else if (c === '[') squareDepth++;
+            else if (c === ']') { squareDepth--; if (squareDepth < 0) return { ok: false, msg: 'Extra closing bracket' }; }
+            else if (c === '{') curlyDepth++;
+            else if (c === '}') { curlyDepth--; if (curlyDepth < 0) return { ok: false, msg: 'Extra closing brace' }; }
         }
         if (depth > 0) return { ok: false, msg: 'Missing closing parenthesis' };
+        if (squareDepth > 0) return { ok: false, msg: 'Missing closing bracket' };
+        if (curlyDepth > 0) return { ok: false, msg: 'Missing closing brace' };
         return { ok: true };
     }
 
@@ -1033,7 +1089,14 @@ class Calculator {
         const resEl = document.getElementById('resultDisplay');
         const modeEl = document.getElementById('displayModeIndicator');
         if (exprEl) exprEl.textContent = this.expression || '';
-        if (resEl) resEl.textContent = this.expression ? this.evaluateExpression(this.expression) : this.result;
+        if (resEl) {
+            if (this.displayResult !== undefined) {
+                resEl.textContent = this.displayResult;
+                this.displayResult = undefined;
+            } else {
+                resEl.textContent = this.expression ? this.evaluateExpression(this.expression) : this.result;
+            }
+        }
         if (modeEl) modeEl.textContent = this.displayMode.toUpperCase() + ' | ' + this.angleMode.substring(0, 3).toUpperCase();
     }
 
@@ -1123,11 +1186,15 @@ class Calculator {
                     this.expression = '';
                     this.updateDisplay();
                 }
+            } else if (e.key.length === 1 || e.key === 'Backspace' || e.key === 'Delete') {
+                // Reset history navigation when user types
+                this.historyIndex = -1;
             }
         });
 
         // Graph mode change
-        document.getElementById('graphMode').addEventListener('change', (e) => {
+        const graphModeSelect = document.getElementById('graphMode');
+        graphModeSelect.addEventListener('change', (e) => {
             const input2 = document.getElementById('graphInput2');
             const input1 = document.getElementById('graphInput');
             if (e.target.value === 'parametric') {
@@ -1142,6 +1209,9 @@ class Calculator {
                 input1.placeholder = 'y = f(x), e.g., sin(x)';
             }
         });
+        
+        // Set initial placeholder on page load
+        graphModeSelect.dispatchEvent(new Event('change'));
     }
 
     populateButtons() {
@@ -1587,10 +1657,16 @@ class Calculator {
         const coeffsRaw = prompt('Enter polynomial coefficients from highest degree to lowest (e.g. 1, -4, 3 for x^2-4x+3):');
         if (!coeffsRaw) return;
         const coeffs = coeffsRaw.split(/[\s,]+/).map(Number).filter(n => !isNaN(n));
-        if (coeffs.length === 0) return;
+        if (coeffs.length === 0) {
+            alert('Please enter valid coefficients.');
+            return;
+        }
         
         const x = parseFloat(prompt('Evaluate at x = '));
-        if (isNaN(x)) return;
+        if (isNaN(x)) {
+            alert('Please enter a valid number for x.');
+            return;
+        }
         
         // Horner's method
         let result = coeffs[0];
@@ -1676,11 +1752,19 @@ class Calculator {
         const vRaw = prompt('Enter values separated by commas:');
         if (!vRaw) return;
         const v = vRaw.split(/[\s,]+/).map(Number).filter(n => !isNaN(n));
+        if (v.length === 0) {
+            alert('Please enter valid numbers for values.');
+            return;
+        }
         const wRaw = prompt('Enter weights separated by commas:');
         if (!wRaw) return;
         const w = wRaw.split(/[\s,]+/).map(Number).filter(n => !isNaN(n));
-        if (v.length === 0 || w.length === 0 || v.length !== w.length) {
-            alert('Values and weights must have the same length and be valid numbers.');
+        if (w.length === 0) {
+            alert('Please enter valid numbers for weights.');
+            return;
+        }
+        if (v.length !== w.length) {
+            alert('Values and weights must have the same length.');
             return;
         }
         const r = this.weightedMean(v, w);
@@ -1778,69 +1862,110 @@ class Calculator {
         this.updateDisplay();
     }
     parseMatrix2D(str) {
-        if (!str || typeof str !== 'string') return [];
+        if (!str || typeof str !== 'string' || str.trim() === '') return null;
         const rows = str.trim().split(/[;\n]+/);
-        return rows.map(row => {
+        const matrix = rows.map(row => {
             const vals = row.split(/[\s,]+/).map(Number).filter(n => !isNaN(n));
-            return vals.length > 0 ? vals : [0];
-        }).filter(row => row.length > 0);
+            return vals.length > 0 ? vals : null;
+        }).filter(row => row !== null);
+        
+        if (matrix.length === 0) return null;
+        
+        // Validate consistent row lengths
+        const firstRowLength = matrix[0].length;
+        for (let i = 1; i < matrix.length; i++) {
+            if (matrix[i].length !== firstRowLength) {
+                alert('Matrix rows must have the same number of columns');
+                return null;
+            }
+        }
+        
+        return matrix;
+    }
+    formatMatrix(M) {
+        if (!M) return 'null';
+        return '[' + M.map(row => '[' + row.map(v => this.formatResult(v)).join(', ') + ']').join(', ') + ']';
     }
     showMatrixDetUI() {
         const s = prompt('Enter matrix (rows separated by ; or newline)\nExample: 1 2 ; 3 4');
         if (!s) return;
         const A = this.parseMatrix2D(s);
+        if (!A) return;
+        const n = A.length;
+        if (A[0].length !== n) { alert('Matrix must be square for determinant'); return; }
         const r = this.matrixDeterminant(A);
         this.expression = 'det = ' + this.formatResult(r);
+        this.result = this.formatResult(r);
+        this.displayResult = this.expression;
         this.updateDisplay();
     }
     showMatrixTransposeUI() {
         const s = prompt('Enter matrix (rows ; separated)\nExample: 1 2 ; 3 4');
         if (!s) return;
         const A = this.parseMatrix2D(s);
+        if (!A) return;
         const T = this.matrixTranspose(A);
-        this.expression = 'Transpose = ' + JSON.stringify(T);
+        this.expression = 'Transpose = ' + this.formatMatrix(T);
+        this.result = this.formatMatrix(T);
+        this.displayResult = this.expression;
         this.updateDisplay();
     }
     showMatrixInverseUI() {
         const s = prompt('Enter square matrix (rows ; separated)');
         if (!s) return;
         const A = this.parseMatrix2D(s);
+        if (!A) return;
         const inv = this.matrixInverse(A);
-        if (!inv) this.expression = 'No inverse';
-        else this.expression = 'Inverse = ' + JSON.stringify(inv);
+        if (!inv) { this.expression = 'No inverse (singular matrix)'; this.displayResult = this.expression; }
+        else { this.expression = 'Inverse = ' + this.formatMatrix(inv); this.result = this.formatMatrix(inv); this.displayResult = this.expression; }
         this.updateDisplay();
     }
     showMatrixAddUI() {
         const s = prompt('Matrix A (rows ; sep):');
         if (!s) return;
         const A = this.parseMatrix2D(s);
+        if (!A) return;
         const t = prompt('Matrix B (same size):');
         if (!t) return;
         const B = this.parseMatrix2D(t);
+        if (!B) return;
         const r = this.matrixAdd(A, B);
-        this.expression = 'A+B = ' + JSON.stringify(r);
+        if (!r) return;
+        this.expression = 'A+B = ' + this.formatMatrix(r);
+        this.result = this.formatMatrix(r);
+        this.displayResult = this.expression;
         this.updateDisplay();
     }
     showMatrixSubUI() {
         const s = prompt('Matrix A:');
         if (!s) return;
         const A = this.parseMatrix2D(s);
+        if (!A) return;
         const t = prompt('Matrix B:');
         if (!t) return;
         const B = this.parseMatrix2D(t);
+        if (!B) return;
         const r = this.matrixSubtract(A, B);
-        this.expression = 'A−B = ' + JSON.stringify(r);
+        if (!r) return;
+        this.expression = 'A−B = ' + this.formatMatrix(r);
+        this.result = this.formatMatrix(r);
+        this.displayResult = this.expression;
         this.updateDisplay();
     }
     showMatrixMulUI() {
         const s = prompt('Matrix A:');
         if (!s) return;
         const A = this.parseMatrix2D(s);
+        if (!A) return;
         const t = prompt('Matrix B (cols A = rows B):');
         if (!t) return;
         const B = this.parseMatrix2D(t);
+        if (!B) return;
         const r = this.matrixMultiply(A, B);
-        this.expression = 'A×B = ' + JSON.stringify(r);
+        if (!r) return;
+        this.expression = 'A×B = ' + this.formatMatrix(r);
+        this.result = this.formatMatrix(r);
+        this.displayResult = this.expression;
         this.updateDisplay();
     }
     showSaveMatrixUI() {
@@ -1849,8 +1974,11 @@ class Calculator {
         const s = prompt('Enter matrix (rows separated by ; or newline)\nExample: 1 2 ; 3 4');
         if (!s) return;
         const A = this.parseMatrix2D(s);
+        if (!A) return;
         this.matrixStorage[name] = A;
-        this.expression = `Saved matrix ${name} = ${JSON.stringify(A)}`;
+        this.expression = `Saved matrix "${name}"`;
+        this.result = this.formatMatrix(A);
+        this.displayResult = this.expression + ' = ' + this.result;
         this.updateDisplay();
     }
     showLoadMatrixUI() {
@@ -1860,34 +1988,41 @@ class Calculator {
             return;
         }
         const A = this.matrixStorage[name];
-        this.expression = `${name} = ${JSON.stringify(A)}`;
+        this.expression = `${name} = ` + this.formatMatrix(A);
+        this.result = this.formatMatrix(A);
+        this.displayResult = this.expression;
         this.updateDisplay();
     }
     parseVector(str) {
-        if (!str || typeof str !== 'string') return [];
+        if (!str || typeof str !== 'string' || str.trim() === '') return null;
         const v = str.trim().split(/[\s,]+/).map(Number).filter(n => !isNaN(n));
-        return v.length > 0 ? v : [];
+        return v.length > 0 ? v : null;
     }
     showVectorDotUI() {
         const a = this.parseVector(prompt('Vector A (e.g. 1 2 or 1,2,3):'));
+        if (!a) return;
         const b = this.parseVector(prompt('Vector B:'));
-        if (a.length === 0 || b.length === 0) return;
+        if (!b) return;
         const r = this.vectorDot(a, b);
+        if (isNaN(r)) return;
         this.expression = 'A·B = ' + this.formatResult(r);
         this.updateDisplay();
     }
     showVectorMagUI() {
         const v = this.parseVector(prompt('Vector (e.g. 3 4):'));
-        if (v.length === 0) return;
+        if (!v) return;
         const r = this.vectorMag(v);
+        if (isNaN(r)) return;
         this.expression = '|v| = ' + this.formatResult(r);
         this.updateDisplay();
     }
     showVectorAngleUI() {
         const a = this.parseVector(prompt('Vector A:'));
+        if (!a) return;
         const b = this.parseVector(prompt('Vector B:'));
-        if (a.length === 0 || b.length === 0) return;
+        if (!b) return;
         const r = this.angleBetweenVectors(a, b);
+        if (isNaN(r)) return;
         this.expression = 'angle = ' + this.formatResult(r) + '°';
         this.updateDisplay();
     }
@@ -1911,7 +2046,7 @@ class Calculator {
         const name = prompt('Enter name for this vector:');
         if (!name) return;
         const v = this.parseVector(prompt('Enter vector components (e.g. 1 2 or 1,2,3):'));
-        if (v.length === 0) return;
+        if (!v) return;
         this.vectorStorage[name] = v;
         this.expression = `Saved vector ${name} = [${v.join(', ')}]`;
         this.updateDisplay();
@@ -1928,19 +2063,21 @@ class Calculator {
     }
     showVectorAddUI() {
         const a = this.parseVector(prompt('Vector A (e.g. 1 2 or 1,2,3):'));
-        if (a.length === 0) return;
+        if (!a) return;
         const b = this.parseVector(prompt('Vector B (same size):'));
-        if (b.length === 0) return;
+        if (!b) return;
         const r = this.vectorAdd(a, b);
+        if (!r) return;
         this.expression = 'A+B = [' + r.map(x => this.formatResult(x)).join(', ') + ']';
         this.updateDisplay();
     }
     showVectorSubUI() {
         const a = this.parseVector(prompt('Vector A (e.g. 1 2 or 1,2,3):'));
-        if (a.length === 0) return;
+        if (!a) return;
         const b = this.parseVector(prompt('Vector B (same size):'));
-        if (b.length === 0) return;
+        if (!b) return;
         const r = this.vectorSub(a, b);
+        if (!r) return;
         this.expression = 'A-B = [' + r.map(x => this.formatResult(x)).join(', ') + ']';
         this.updateDisplay();
     }

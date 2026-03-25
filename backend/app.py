@@ -571,6 +571,83 @@ def import_note_to_files(note_id):
     
     return jsonify({"message": "Note imported to files", "id": file_response.data[0]["id"] if file_response.data else None}), 201
 
+# ===== URL SHORTENER =====
+@app.route("/short-urls", methods=["GET"])
+def get_short_urls():
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    user_id = verify_token(token)
+    if not user_id:
+        return jsonify({"message": "Unauthorized"}), 401
+
+    response = supabase.table("short_urls").select("*").eq("user_id", user_id).order("created_at", desc=True).execute()
+    return jsonify(response.data)
+
+@app.route("/short-urls", methods=["POST"])
+def create_short_url():
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    user_id = verify_token(token)
+    if not user_id:
+        return jsonify({"message": "Unauthorized"}), 401
+
+    data = request.json
+    original_url = data.get("original_url")
+    alias = data.get("alias")
+    title = data.get("title", "Untitled")
+
+    if not original_url:
+        return jsonify({"message": "Missing original URL"}), 400
+    
+    if not alias:
+        return jsonify({"message": "Missing alias"}), 400
+
+    # Check if alias already exists for this user
+    existing = supabase.table("short_urls").select("*").eq("alias", alias).execute()
+    if existing.data:
+        return jsonify({"message": "Alias already exists. Please choose another."}), 400
+
+    # Create short URL
+    base_url = request.host_url.rstrip('/')
+    short_url = f"{base_url}/s/{alias}"
+
+    response = supabase.table("short_urls").insert({
+        "user_id": user_id,
+        "original_url": original_url,
+        "alias": alias,
+        "short_url": short_url,
+        "title": title,
+        "clicks": 0
+    }).execute()
+    
+    return jsonify({"message": "Short URL created", "short_url": short_url, "id": response.data[0]["id"] if response.data else None}), 201
+
+@app.route("/short-urls/<int:id>", methods=["DELETE"])
+def delete_short_url(id):
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    user_id = verify_token(token)
+    if not user_id:
+        return jsonify({"message": "Unauthorized"}), 401
+
+    supabase.table("short_urls").delete().eq("id", id).eq("user_id", user_id).execute()
+    return jsonify({"message": "Deleted"})
+
+# Redirect short URL
+@app.route("/s/<alias>", methods=["GET"])
+def redirect_short_url(alias):
+    response = supabase.table("short_urls").select("*").eq("alias", alias).execute()
+    
+    if not response.data:
+        return jsonify({"message": "Short URL not found"}), 404
+    
+    url_data = response.data[0]
+    
+    # Increment click count
+    new_clicks = (url_data.get("clicks") or 0) + 1
+    supabase.table("short_urls").update({"clicks": new_clicks}).eq("alias", alias).execute()
+    
+    # Redirect to original URL
+    from flask import redirect
+    return redirect(url_data["original_url"], code=302)
+
 # ===== EMAIL REMINDER (SMTP) =====
 def get_smtp_config():
     try:

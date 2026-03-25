@@ -74,6 +74,23 @@ async def on_fetch(request, env):
         with open("frontend/auth/register.html", "r") as f:
             return Response(f.read(), mimetype="text/html")
     
+    # URL Shortener - Public redirect endpoint (NO AUTH REQUIRED)
+    if path.startswith("/s/") and method == "GET":
+        alias = path.split("/s/")[1]
+        resp = supabase.table("short_urls").select("*").eq("alias", alias).execute()
+        
+        if not resp.data:
+            return json_response({"message": "Short URL not found"}, 404)
+        
+        url_data = resp.data[0]
+        
+        # Increment click count
+        new_clicks = (url_data.get("clicks") or 0) + 1
+        supabase.table("short_urls").update({"clicks": new_clicks}).eq("alias", alias).execute()
+        
+        # Redirect to original URL
+        return Response.redirect(url_data["original_url"], status=302)
+    
     # API Routes
     if path == "/register" and method == "POST":
         data = await request.json()
@@ -304,5 +321,46 @@ async def on_fetch(request, env):
             "data": encoded
         }).execute()
         return json_response({"message": "Imported"})
+    
+    # URL Shortener - Get all short URLs
+    if path == "/short-urls" and method == "GET":
+        resp = supabase.table("short_urls").select("*").eq("user_id", user_id).order("created_at", desc=True).execute()
+        return json_response(resp.data)
+    
+    # URL Shortener - Create short URL
+    if path == "/short-urls" and method == "POST":
+        data = await request.json()
+        original_url = data.get("original_url")
+        alias = data.get("alias")
+        title = data.get("title", "Untitled")
+        
+        if not original_url or not alias:
+            return json_response({"message": "Missing URL or alias"}, 400)
+        
+        # Check if alias exists
+        existing = supabase.table("short_urls").select("*").eq("alias", alias).execute()
+        if existing.data:
+            return json_response({"message": "Alias already exists"}, 400)
+        
+        # Create short URL
+        base_url = request.url.split("/short-urls")[0]
+        short_url = f"{base_url}/s/{alias}"
+        
+        resp = supabase.table("short_urls").insert({
+            "user_id": user_id,
+            "original_url": original_url,
+            "alias": alias,
+            "short_url": short_url,
+            "title": title,
+            "clicks": 0
+        }).execute()
+        
+        return json_response({"message": "Created", "short_url": short_url, "id": resp.data[0]["id"]}, 201)
+    
+    # URL Shortener - Delete short URL
+    if path.startswith("/short-urls/") and method == "DELETE":
+        url_id = int(path.split("/")[2])
+        supabase.table("short_urls").delete().eq("id", url_id).eq("user_id", user_id).execute()
+        return json_response({"message": "Deleted"})
     
     return json_response({"message": "Not found"}, 404)

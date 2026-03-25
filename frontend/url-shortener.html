@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>URL Shortener - XQXing-Plushy</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="auth/auth.css">
+  <link rel="stylesheet" href="css/url-shortener.css">
+</head>
+<body>
+
+<div class="dashboard-container">
+  
+  <header class="global-glass-header" style="grid-template-columns: 1fr auto 1fr;">
+    <div class="header-left">
+      <a href="index.html" class="nav-back-btn icon-text-btn">
+        <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+        <span>Back</span>
+      </a>
+    </div>
+    
+    <div class="header-center">
+      <h2>🔗 URL Shortener</h2>
+    </div>
+    
+    <div class="header-right auth-profile">
+      <span id="username-display" class="user-name"></span>
+      <button class="nav-logout-btn icon-text-btn" onclick="logout()">
+        <span>Logout</span>
+        <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="url-shortener-layout visible">
+    
+    <!-- Create Short URL Section -->
+    <section class="glass-panel create-section">
+      <h3>✨ Create Short URL</h3>
+      
+      <div class="input-group">
+        <label for="original-url">Original URL</label>
+        <input 
+          type="url" 
+          id="original-url" 
+          class="glass-input" 
+          placeholder="https://example.com/very/long/url/here"
+          required
+        >
+      </div>
+
+      <div class="input-group">
+        <label for="custom-alias">Custom Alias (Optional)</label>
+        <div class="alias-input-wrapper">
+          <span class="domain-prefix">short.ly/</span>
+          <input 
+            type="text" 
+            id="custom-alias" 
+            class="glass-input alias-input" 
+            placeholder="my-link"
+            pattern="[a-zA-Z0-9-_]+"
+            maxlength="50"
+          >
+        </div>
+        <small class="input-hint">Leave empty for random alias. Only letters, numbers, hyphens, and underscores.</small>
+      </div>
+
+      <div class="input-group">
+        <label for="url-title">Title (Optional)</label>
+        <input 
+          type="text" 
+          id="url-title" 
+          class="glass-input" 
+          placeholder="My Important Link"
+          maxlength="100"
+        >
+      </div>
+
+      <button id="create-btn" class="primary-btn">
+        <span>🚀 Create Short URL</span>
+      </button>
+
+      <!-- Result Display -->
+      <div id="result-section" class="result-section hidden">
+        <div class="result-card">
+          <div class="result-header">
+            <span class="success-icon">✅</span>
+            <h4>Short URL Created!</h4>
+          </div>
+          <div class="short-url-display">
+            <input type="text" id="short-url-output" class="short-url-input" readonly>
+            <button id="copy-btn" class="copy-btn" title="Copy to clipboard">
+              <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            </button>
+          </div>
+          <div class="result-actions">
+            <button id="visit-btn" class="secondary-btn">Visit URL</button>
+            <button id="qr-btn" class="secondary-btn">Show QR Code</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- My URLs Section -->
+    <section class="glass-panel urls-section">
+      <div class="section-header">
+        <h3>📋 My Short URLs</h3>
+        <div class="filter-controls">
+          <input 
+            type="text" 
+            id="search-urls" 
+            class="glass-input search-input" 
+            placeholder="🔍 Search..."
+          >
+          <select id="sort-select" class="glass-input sort-select">
+            <option value="recent">Most Recent</option>
+            <option value="clicks">Most Clicks</option>
+            <option value="title">Title A-Z</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="urls-list" class="urls-list">
+        <div class="loading-message">Loading your URLs...</div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- QR Code Modal -->
+<div id="qr-modal" class="modal-overlay hidden">
+  <div class="modal-content qr-modal">
+    <div class="modal-header">
+      <h3>QR Code</h3>
+      <button class="modal-close" onclick="closeQRModal()">✕</button>
+    </div>
+    <div class="qr-body">
+      <div id="qr-code-container"></div>
+      <p id="qr-url-text" class="qr-url-text"></p>
+      <button id="download-qr-btn" class="primary-btn">Download QR Code</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast container -->
+<div id="toastContainer" class="toast-container" aria-live="polite"></div>
+
+<!-- QR Code Library -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+<script src="auth/auth.js"></script>
+<script src="js/url-shortener.js"></script>
+<script src="js/main.js"></script>
+
+<script>
+if (!isLoggedIn()) {
+  window.location.href = "auth/login.html";
+} else {
+  document.getElementById("username-display").textContent = "Hi, " + getUsername();
+}
+</script>
+
+</body>
+</html>
