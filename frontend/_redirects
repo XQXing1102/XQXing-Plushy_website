@@ -1,7 +1,21 @@
 # Cloudflare Pages - SPA routing
-# Serve xyz123.html for secret commands (don't redirect)
+# Serve specific HTML files directly (don't redirect)
 /xyz123.html /xyz123.html 200
+/finance.html /finance.html 200
+/url-shortener.html /url-shortener.html 200
+/calculator.html /calculator.html 200
+/todo.html /todo.html 200
+/pomodoro.html /pomodoro.html 200
+/notes.html /notes.html 200
+/json-formatter.html /json-formatter.html 200
+/mindmap.html /mindmap.html 200
+/files.html /files.html 200
+/admin.html /admin.html 200
+/landing.html /landing.html 200
+
+# Auth pages
+/auth/login.html /auth/login.html 200
+/auth/register.html /auth/register.html 200
 
 # All other routes go to index.html
-/*
-index.html 200
+/* /index.html 200
